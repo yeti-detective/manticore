@@ -1,7 +1,8 @@
 import string
 
 from . import Manticore
-from .core.smtlib import ConstraintSet, Operators, solver, issymbolic, Array, Expression, Constant, operators
+from .core.smtlib import ConstraintSet, Operators, solver, issymbolic, Array, Expression, Constant, operators, \
+    to_constant
 from .core.smtlib.visitors import arithmetic_simplify, pretty_print
 from .platforms import evm
 from .core.state import State
@@ -70,6 +71,7 @@ class IntegerOverflow(Detector):
 
     def did_evm_execute_instruction_callback(self, state, instruction, arguments, result):
         mnemonic = instruction.semantics
+        # print mnemonic
 
         if mnemonic == 'ADD':
             if self._can_add_overflow(state, result, *arguments):
@@ -371,7 +373,7 @@ class ABI(object):
         offset = arithmetic_simplify(offset)
         padding = 32 - nbytes # for 160
         value = Operators.CONCAT(nbytes*8, *map(Operators.ORD, data[offset+padding:offset+padding+nbytes]))
-        return arithmetic_simplify(value)
+        return to_constant(arithmetic_simplify(value))
 
     @staticmethod        
     def _consume_type(ty, data, offset):
@@ -409,9 +411,13 @@ class ABI(object):
             size = int(ty[5:])
             return data[offset:offset+size], offset+32
         elif ty == u'address[]':
-            dyn_offset = arithmetic_simplify(ABI.get_uint(data, 32, offset))
-            size = arithmetic_simplify(ABI.get_uint(data, 32, dyn_offset))
-            result = [ABI.get_uint(data, 20, dyn_offset+32 + 32*i) for i in range(size)]
+            dyn_offset = to_constant(arithmetic_simplify(ABI.get_uint(data, 32, offset)))
+            size = to_constant(arithmetic_simplify(ABI.get_uint(data, 32, dyn_offset)))
+            print dyn_offset, 33
+            dyn_offset = to_constant(dyn_offset)
+            concrete_size = to_constant(size)
+            result = [ABI.get_uint(data, 20, dyn_offset+32 + 32*i) for i in range(concrete_size)]
+            print 'the result', result
             return result, offset+32
         else:
             raise NotImplementedError(repr(ty))
@@ -1218,6 +1224,7 @@ class ManticoreEVM(Manticore):
                 element_size = 1
 
             concrete_number_of_elements_in_arg = space_for_each_arg_aligned/element_size
+            print 'concrete num elements in args', concrete_number_of_elements_in_arg
             state.constrain(number_of_elements_in_arg == concrete_number_of_elements_in_arg)
             data[free_pointer:free_pointer + 32]= pack32(concrete_number_of_elements_in_arg)
 
@@ -1323,6 +1330,7 @@ class ManticoreEVM(Manticore):
 
 
 
+                        print 'concstrainted'
                         self._concretize_offsets_and_sizes(state, signature, tx.data)
                         function_name, arguments = ABI.parse(signature, tx.data)
 
@@ -1334,7 +1342,9 @@ class ManticoreEVM(Manticore):
                         tx_summary.write( "Function call:\n")
                         tx_summary.write("%s(" % state.solve_one(function_name ))
 
+                        print 'doin the args'
                         for argument in arguments:
+                            print 'argg', argument
                             if isinstance(argument, (list, tuple)):
                                 tx_summary.write('{')
                                 tx_summary.write( ','.join(map(repr, map(state.solve_one, argument))))
@@ -1345,6 +1355,7 @@ class ManticoreEVM(Manticore):
                                 tx_summary.write(', ')
                             else:
                                 tx_summary.write('\n')
+                        print 'did the args'
 
                         is_argument_symbolic = any(map(issymbolic, arguments))
                         is_something_symbolic = is_something_symbolic or is_argument_symbolic
@@ -1389,6 +1400,7 @@ class ManticoreEVM(Manticore):
                 from .utils import iterpickle
                 logger.debug("Using iterpickle to dump state")
                 statef.write(iterpickle.dumps(state, 2))
+        print 'doneeeee'
 
 
 

@@ -1273,6 +1273,7 @@ class EVM(Eventful):
         return self.stack.pop()
 
     def _consume(self, fee):
+        # print 'fee', fee
         assert fee >= 0
         if self._gas < fee:
             logger.debug("Not enough gas for instruction")
@@ -1590,17 +1591,22 @@ class EVM(Eventful):
     def CALLDATACOPY(self, mem_offset, data_offset, size):
         '''Copy input data in current environment to memory'''
         GCOPY = 3             # cost to copy one 32 byte word
-        self._consume(GCOPY * ceil32(size) // 32)
+        print 1111111, size
+        # self._consume(GCOPY * ceil32(size) // 32)
 
 
+        import IPython; IPython.embed()
         #FIXME put zero if not enough data
         if issymbolic(size) or issymbolic(data_offset):
             #self._constraints.add(Operators.ULE(data_offset, len(self.data)))
             self._constraints.add(Operators.ULE(size+data_offset, len(self.data) + (32-len(self.data)%32) ))
 
         if issymbolic(size):
-            raise ConcretizeStack(3, policy='ALL')
+            print 'fuck conc the stack'
+            raise ConcretizeStack(3, 'ONE')
+            # raise ConcretizeStack(3, policy='ALL')
 
+        print 'ok did the sthi'
         for i in range(size):
             c = Operators.ITEBV(8,data_offset+i < len(self.data), Operators.ORD(self.data[data_offset+i]), 0)
             self._store(mem_offset+i, c)
