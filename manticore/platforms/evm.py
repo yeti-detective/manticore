@@ -1578,11 +1578,19 @@ class EVM(Eventful):
         if issymbolic(offset):
             self.constraints.add(offset<len(self.data)+32)
 
+
+        import ipdb; ipdb.set_trace()
+        print 'in a calldataload\n\n'
         bytes = list(self.data[offset:offset+32])
+        print 'bytessss', bytes
+        print 'offsettt', offset
         bytes += list('\x00'*( 32-len(bytes)))
         bytes = map(Operators.ORD, bytes)
         value = Operators.CONCAT(256, *bytes)
-        return value 
+
+
+        print 'cdll ret', value
+        return value
 
     def CALLDATASIZE(self):
         '''Get size of input data in current environment'''
@@ -1593,7 +1601,6 @@ class EVM(Eventful):
         GCOPY = 3             # cost to copy one 32 byte word
         print 1111111, size
         # self._consume(GCOPY * ceil32(size) // 32)
-
 
         import IPython; IPython.embed()
         #FIXME put zero if not enough data

@@ -946,7 +946,8 @@ class ManticoreEVM(Manticore):
         attacker_account = self.create_account(balance=1000)
 
         def run_symbolic_tx():
-            symbolic_data = self.make_symbolic_buffer(320)
+            # symbolic_data = self.make_symbolic_buffer(320)
+            symbolic_data = self.make_symbolic_buffer(4+32*3)
             symbolic_value = self.make_symbolic_value()
             self.transaction(caller=attacker_account,
                              address=contract_account,
