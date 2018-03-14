@@ -11,7 +11,7 @@ except:
 
 from ..utils.nointerrupt import WithKeyboardInterruptAs
 from ..utils.event import Eventful
-from .smtlib import solver, Expression, SolverException
+from .smtlib import solver, Expression, SolverException, pretty_print
 from .state import Concretize, TerminateState
 from workspace import Workspace
 from multiprocessing.managers import SyncManager
@@ -475,7 +475,30 @@ class Executor(Eventful):
                         #setstate()
 
                         logger.debug("Generic state fork on condition")
-                        current_state = self.fork(current_state, e.expression, e.policy, e.setstate)
+                        try:
+                            current_state = self.fork(current_state, e.expression, e.policy, e.setstate)
+                        except SolverException:
+                            for c in current_state.constraints._constraints:
+                                print c
+                                print pretty_print(c)
+                            print 'expressss'
+                            print pretty_print(e.expression)
+
+                            print current_state.constraints
+
+                            def makenewcs(*cons):
+                                from manticore.core.smtlib import ConstraintSet
+                                cs = ConstraintSet()
+                                for c in cons:
+                                    cs.add(c)
+                                return cs
+
+
+                            import ipdb; ipdb.set_trace()
+                            def p(x):
+                                print pretty_print(x)
+                            pass
+                            raise
 
                     except TerminateState as e:
                         #Notify this worker is done

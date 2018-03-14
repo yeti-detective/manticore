@@ -1332,6 +1332,8 @@ class EVM(Eventful):
                 self._push(arg)
             def setstate(state, value):
                 self.stack[-ex.pos] = value
+
+            print 'sitt', ex.policy
             raise Concretize("Concretice Stack Variable",
                                 expression=self.stack[-ex.pos], 
                                 setstate=setstate,
@@ -1576,14 +1578,16 @@ class EVM(Eventful):
         #FIXME Document and make it configurable
         #Do not explore offsets much bigger than actual data
         if issymbolic(offset):
-            self.constraints.add(Operators.ULE(offset,len(self.data)+32))
+            # import ipdb; ipdb.set_trace()
+            # self.constraints.add(Operators.ULE(offset,len(self.data)+32))
+            self.constraints.add(Operators.ULE(offset,len(self.data)+ (32 - len(self.data) % 32)))
 
+        print 'calldataload len data', len(self.data)
         print 'in a calldataload\n\n'
         bytes = list()
         for i in xrange(32):
             bytes.append(self.data[offset+i])
 
-        import ipdb; ipdb.set_trace()
 
         # print pretty_print(self.data.array)
         # bytes = list(self.data[offset:offset+32])
@@ -1592,6 +1596,7 @@ class EVM(Eventful):
         # bytes += list('\x00'*( 32-len(bytes)))
         # bytes = map(Operators.ORD, bytes)
         value = Operators.CONCAT(256, *bytes)
+        # import ipdb; ipdb.set_trace()
 
 
         print 'cdll ret', value
@@ -1605,19 +1610,26 @@ class EVM(Eventful):
         '''Copy input data in current environment to memory'''
         GCOPY = 3             # cost to copy one 32 byte word
         print 1111111, size
+        print 'calldatacopy len data', len(self.data)
         # self._consume(GCOPY * ceil32(size) // 32)
 
-        import IPython; IPython.embed()
+        # import ipdb; ipdb.set_trace()
         #FIXME put zero if not enough data
         if issymbolic(size) or issymbolic(data_offset):
+            # constrain the offset+size so that
+            # 32 is an author choice for how much out of bounds space to allow
+            # import ipdb; ipdb.set_trace()
+
             #self._constraints.add(Operators.ULE(data_offset, len(self.data)))
             self._constraints.add(Operators.ULE(size+data_offset, len(self.data) + (32-len(self.data)%32) ))
 
         if issymbolic(size):
             print 'fuck conc the stack'
-            raise ConcretizeStack(3, 'ONE')
+            # import ipdb; ipdb.set_trace()
+            raise ConcretizeStack(3, policy='ONE')
             # raise ConcretizeStack(3, policy='ALL')
 
+        import ipdb; ipdb.set_trace()
         print 'ok did the sthi'
         for i in range(size):
             c = Operators.ITEBV(8,data_offset+i < len(self.data), Operators.ORD(self.data[data_offset+i]), 0)
