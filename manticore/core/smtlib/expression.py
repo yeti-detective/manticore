@@ -630,6 +630,9 @@ class ArrayStore(ArrayOperation):
         return self.operands[2]
 
 class ArrayProxy(Array):
+    """
+    This class is iterable because it implements __len__ and __getitem__
+    """
     def __init__(self, array):
         assert isinstance(array, Array)
 
@@ -706,6 +709,16 @@ class ArrayProxy(Array):
             size = BitVecConstant(self._array.index_bits, size)
         assert isinstance(size, BitVecConstant)
         return size.value
+
+    def getslice(self, start, end):
+        """
+        does the dumb thing and returns a concrete list of array selects
+        [start:end]
+        :param start:
+        :param end:
+        :return:
+        """
+        pass
 
     def __getitem__(self, index):
         if isinstance(index, slice):

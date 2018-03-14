@@ -75,7 +75,7 @@ class IntegerOverflow(Detector):
 
         if mnemonic == 'ADD':
             if self._can_add_overflow(state, result, *arguments):
-                self.add_finding(state, "Integer overflow at {} instruction".format(mnemonic))
+                self.add_finding(state, "Integer overflow at {} instruction {:x}".format(mnemonic, state.platform.current.pc))
         elif mnemonic == 'MUL':
             if self._can_mul_overflow(state, result, *arguments):
                 self.add_finding(state, "Integer overflow at {} instruction".format(mnemonic))

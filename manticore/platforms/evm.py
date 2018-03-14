@@ -1578,14 +1578,19 @@ class EVM(Eventful):
         if issymbolic(offset):
             self.constraints.add(offset<len(self.data)+32)
 
+        print 'in a calldataload\n\n'
+        bytes = list()
+        for i in xrange(32):
+            bytes.append(self.data[i])
 
         import ipdb; ipdb.set_trace()
-        print 'in a calldataload\n\n'
-        bytes = list(self.data[offset:offset+32])
+
+        # print pretty_print(self.data.array)
+        # bytes = list(self.data[offset:offset+32])
         print 'bytessss', bytes
         print 'offsettt', offset
-        bytes += list('\x00'*( 32-len(bytes)))
-        bytes = map(Operators.ORD, bytes)
+        # bytes += list('\x00'*( 32-len(bytes)))
+        # bytes = map(Operators.ORD, bytes)
         value = Operators.CONCAT(256, *bytes)
 
 
@@ -2302,8 +2307,9 @@ class EVMWorld(Platform):
                 }
         if any([ isinstance(data[i], Expression) for i in range(len(data))]): 
             data_symb = self._constraints.new_array(index_bits=256, index_max=len(data))
-            for i in range(len(data)):
-                data_symb[i] = Operators.ORD(data[i])
+            # for i in range(len(data)):
+            #     # we need this if we're going to partially concretize the data.
+            #     data_symb[i] = Operators.ORD(data[i])
             data = data_symb
         else:
             data = ''.join(data)
