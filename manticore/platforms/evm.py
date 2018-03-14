@@ -1581,7 +1581,7 @@ class EVM(Eventful):
         print 'in a calldataload\n\n'
         bytes = list()
         for i in xrange(32):
-            bytes.append(self.data[i])
+            bytes.append(self.data[offset+i])
 
         import ipdb; ipdb.set_trace()
 
