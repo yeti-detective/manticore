@@ -1576,7 +1576,7 @@ class EVM(Eventful):
         #FIXME Document and make it configurable
         #Do not explore offsets much bigger than actual data
         if issymbolic(offset):
-            self.constraints.add(offset<len(self.data)+32)
+            self.constraints.add(Operators.ULE(offset,len(self.data)+32))
 
         print 'in a calldataload\n\n'
         bytes = list()
