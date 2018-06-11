@@ -124,6 +124,7 @@ class State(Eventful):
 
     def execute(self):
         try:
+            print 'state execute'
             result = self._platform.execute()
 
         # Instead of State importing SymbolicRegisterException and SymbolicMemoryException

@@ -600,6 +600,7 @@ class Cpu(Eventful):
         '''
         if size is None:
             size = self.address_bit_size
+        print size, 'ugh'
         assert size in SANE_SIZES
         self._publish('will_read_memory', where, size)
 
@@ -808,6 +809,7 @@ class Cpu(Eventful):
         '''
         Decode, and execute one instruction pointed by register PC
         '''
+        print 'ugh yo'
         if issymbolic(self.PC):
             raise ConcretizeRegister(self, 'PC', policy='ALL')
 
@@ -836,7 +838,9 @@ class Cpu(Eventful):
             implementation = getattr(self, name, None)
 
             if implementation is not None:
+                print 'RAN INSTRUCTION', hex(self.PC)
                 implementation(*insn.operands)
+                print 'RAN INSTRUCTION', hex(self.PC)
 
             else:
                 text_bytes = ' '.join('%02x' % x for x in insn.bytes)

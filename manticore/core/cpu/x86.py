@@ -659,6 +659,7 @@ class AMD64Operand(Operand):
             #logger.info("Read from immediate value: %x", o.imm)
             return o.imm
         elif self.type == 'memory':
+            # import ipdb; ipdb.set_trace()
             value = cpu.read_int(self.address(), self.size)
             #logger.info("read mem operand from %x value: %x",self.address(), value)
             return value

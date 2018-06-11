@@ -1094,31 +1094,39 @@ class LazySMemory(SMemory):
 
     def __init__(self, constraints, *args, **kwargs):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
+        # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
+        self.bigarray = ArrayMap(0, 2**32 - 1, 'rw', 32, name='bigarray')
+        # self._add(bigarray)
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
-        assert addr is None or isinstance(addr, (int, long)), 'Address must be concrete'
-        assert addr < self.memory_size, 'Address too big'
-        assert size > 0
-
-        if addr is not None:
-            addr = self._floor(addr)
-
-        size = self._ceil(size)
-
-        addr = self._search(size, addr)
-
-        # It should not be allocated
-        for i in xrange(self._page(addr), self._page(addr + size)):
-            if i in self._page2map:
-                raise MemoryException("Can't mmap; map already used", addr)
-
-        m = ArrayMap(addr, size, perms, self.memory_bit_size, name=name)
-
-        self._add(m)
-
-        logger.debug('New symbolic memory map @{:x} size:{:x}'.format(addr, size))
-
+        assert isinstance(addr, (int, long))
+        print 'hi?', hex(addr)
         return addr
+
+
+        # assert addr is None or isinstance(addr, (int, long)), 'Address must be concrete'
+        # assert addr < self.memory_size, 'Address too big'
+        # assert size > 0
+        #
+        # if addr is not None:
+        #     addr = self._floor(addr)
+        #
+        # size = self._ceil(size)
+        #
+        # addr = self._search(size, addr)
+        #
+        # # It should not be allocated
+        # for i in xrange(self._page(addr), self._page(addr + size)):
+        #     if i in self._page2map:
+        #         raise MemoryException("Can't mmap; map already used", addr)
+        #
+        # m = ArrayMap(addr, size, perms, self.memory_bit_size, name=name)
+        #
+        # self._add(m)
+        #
+        # logger.debug('New symbolic memory map @{:x} size:{:x}'.format(addr, size))
+        #
+        # return addr
 
     def _deref_can_succeed(self, map, address, size):
         if not issymbolic(address):
@@ -1142,20 +1150,27 @@ class LazySMemory(SMemory):
             return found
 
     def read(self, address, size, force=False):
-        m = self.map_containing(address)
-        if isinstance(m, ArrayMap):
-            page_offset = address - m.start
-            return m[page_offset:page_offset + size]
-        else:
-            return super(SMemory, self).read(address, size, force)
+        page_offset = address
+        return self.bigarray[page_offset:page_offset + size]
+
+        # m = self.map_containing(address)
+        # if isinstance(m, ArrayMap):
+        #     page_offset = address - m.start
+        #     return m[page_offset:page_offset + size]
+        # else:
+        #     return super(SMemory, self).read(address, size, force)
 
     def write(self, address, value, force=False):
-        m = self.map_containing(address)
-        if isinstance(m, ArrayMap):
-            page_offset = address - m.start
-            m[page_offset:page_offset + len(value)] = value
-        else:
-            return super(SMemory, self).write(address, value, force)
+        page_offset = address
+        self.bigarray[page_offset:page_offset + len(value)] = value
+        return
+
+        # m = self.map_containing(address)
+        # if isinstance(m, ArrayMap):
+        #     page_offset = address - m.start
+        #     m[page_offset:page_offset + len(value)] = value
+        # else:
+        #     return super(SMemory, self).write(address, value, force)
 
 
 class Memory32(Memory):
