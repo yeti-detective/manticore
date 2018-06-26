@@ -15,6 +15,8 @@ from ...utils.helpers import issymbolic
 from ...utils.emulate import UnicornEmulator
 from ...utils.event import Eventful
 
+import struct
+
 logger = logging.getLogger(__name__)
 register_logger = logging.getLogger('{}.registers'.format(__name__))
 
@@ -754,34 +756,30 @@ class Cpu(Eventful):
         for address in xrange(pc, pc + self.max_instr_width):
             # This reads a byte from memory ignoring permissions
             # and concretize it if symbolic
-            print self.memory
+            # print self.memory
             if not self.memory.access_ok(address, 'x'):
                 break
 
-            print 'going to get c'
-            print 'self memory xx', self.memory
+            # print 'going to get c'
+            # print 'self memory xx', self.memory
             c = self.memory[address]
-            from ..smtlib import *
-            # print 'aaaaaaaa', pretty_print(self.memory.bigarray.array)
-            print 'got c',c
-
-            print pretty_print(c)
-            print solver.get_all_values(ConstraintSet(), c)
-            print len(solver.get_all_values(ConstraintSet(), c))
-
-            assert 0
 
             if issymbolic(c):
-                assert isinstance(c, BitVec) and c.size == 8
-                if isinstance(c, Constant):
-                    c = chr(c.value)
-                else:
-                    logger.error('Concretize executable memory %r %r', c, text)
-                    raise ConcretizeMemory(self.memory,
-                                           address=pc,
-                                           size=8 * self.max_instr_width,
-                                           policy='ONE')
-                                           # policy='INSTRUCTION')
+                from ..smtlib import *
+                xxx = solver.get_all_values(ConstraintSet(), c)[0]
+                # print 'the bytes', xxx
+                c =  struct.pack('B', solver.get_all_values(ConstraintSet(), c)[0])
+                # assert isinstance(c, BitVec) and c.size == 8
+                # if isinstance(c, Constant):
+                #     c = chr(c.value)
+                # else:
+                #     logger.error('Concretize executable memory %r %r', c, text)
+                #     raise ConcretizeMemory(self.memory,
+                #                            address=pc,
+                #                            size=8 * self.max_instr_width,
+                #                            policy='ONE')
+                #                            # policy='INSTRUCTION')
+
             text += c
 
         # Pad potentially incomplete instruction with zeroes

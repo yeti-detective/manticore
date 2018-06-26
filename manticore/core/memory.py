@@ -896,7 +896,6 @@ class Memory(object):
         if isinstance(index, slice):
             result = self.read(index.start, index.stop - index.start)
         else:
-            print 'trying to read'
             result = self.read(index, 1)[0]
         return result
 
@@ -1095,6 +1094,12 @@ class LazySMemory(SMemory):
     Currently does not support cross-page reads/writes.
     '''
 
+    def __reduce__(self):
+        return (self.__class__, (self.constraints,), {'backing_array': self.bigarray})
+
+    def __setstate__(self, state):
+        self.bigarray = state['backing_array']
+
     def __init__(self, constraints, *args, **kwargs):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
@@ -1172,7 +1177,7 @@ class LazySMemory(SMemory):
         # for i in xrange(self._page(addr), self._page(addr + size)):
         #     assert i not in self._page2map, 'Map already used'
 
-        print filename
+        # print filename
 
         # with open(filename, 'r') as fileobject:
         #     fileobject.seek(0, 2)
@@ -1187,16 +1192,13 @@ class LazySMemory(SMemory):
             fdata = f.read()
 
         towrite = min(size, len(fdata[offset:]))
-        print 'towrite', towrite
-        print 'len fdata', len(fdata)
+        # print 'towrite', towrite
+        # print 'len fdata', len(fdata)
 
         for i in xrange(towrite):
-            print hex(addr+i), fdata[offset+i].encode('hex')
+            # print hex(addr+i), fdata[offset+i].encode('hex')
             self.bigarray[addr+i:addr+i+1] = fdata[offset+i]
-            print 'x', self.bigarray[addr+i]
-            # from ..core.smtlib import pretty_print
-            # print pretty_print(self.bigarray[addr+i])
-            break
+            # print 'x', self.bigarray[addr+i]
 
         # Create the map
         # m = FileMap(addr, size, perms, filename, offset)
@@ -1234,9 +1236,9 @@ class LazySMemory(SMemory):
 
     def read(self, address, size, force=False):
         page_offset = address
-        print 'mem read', hex(address), size
+        # print 'mem read', hex(address), size
         ret = self.bigarray[page_offset:page_offset + size]
-        print 'got the ret', ret
+        # print 'got the ret', ret
         return ret
 
         # m = self.map_containing(address)
