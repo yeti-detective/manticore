@@ -1104,7 +1104,7 @@ class LazySMemory(SMemory):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
-        self.bigarray = constraints.new_array()
+        self.bigarray = constraints.new_array(index_bits=self.memory_bit_size)
         # self._add(bigarray)
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
