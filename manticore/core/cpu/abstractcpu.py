@@ -580,7 +580,7 @@ class Cpu(Eventful):
         '''
         if size is None:
             size = self.address_bit_size
-        assert size in SANE_SIZES
+        # assert size in SANE_SIZES
         self._publish('will_write_memory', where, expression, size)
 
         data = [Operators.CHR(Operators.EXTRACT(expression, offset, 8)) for offset in xrange(0, size, 8)]
@@ -601,7 +601,7 @@ class Cpu(Eventful):
         if size is None:
             size = self.address_bit_size
         print size, 'ugh'
-        assert size in SANE_SIZES
+        # assert size in SANE_SIZES
         self._publish('will_read_memory', where, size)
 
         data = self._memory.read(where, size / 8, force)
@@ -768,7 +768,8 @@ class Cpu(Eventful):
                     raise ConcretizeMemory(self.memory,
                                            address=pc,
                                            size=8 * self.max_instr_width,
-                                           policy='INSTRUCTION')
+                                           policy='ONE')
+                                           # policy='INSTRUCTION')
             text += c
 
         # Pad potentially incomplete instruction with zeroes
