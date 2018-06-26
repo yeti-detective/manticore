@@ -115,6 +115,7 @@ class Map(object):
 
     def access_ok(self, access):
         ''' Check if there is enough permissions for access '''
+        print 'xxxx perms', self.perms, 'access', access
         for c in access:
             if c not in self.perms:
                 return False
@@ -807,6 +808,7 @@ class Memory(object):
             if index not in self:
                 return False
             m = self.map_containing(index)
+            print 'map cont access ok', m
             return force or m.access_ok(access)
 
     # write and read potentially symbolic bytes at symbolic indexes
@@ -894,6 +896,7 @@ class Memory(object):
         if isinstance(index, slice):
             result = self.read(index.start, index.stop - index.start)
         else:
+            print 'trying to read'
             result = self.read(index, 1)[0]
         return result
 
@@ -1095,12 +1098,13 @@ class LazySMemory(SMemory):
     def __init__(self, constraints, *args, **kwargs):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
-        self.bigarray = ArrayMap(0, 2**32 - 1, 'rw', 32, name='bigarray')
+        # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
+        self.bigarray = constraints.new_array()
         # self._add(bigarray)
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, (int, long))
-        print 'hi?', hex(addr)
+        print 'mmapping', hex(addr)
         return addr
 
 
@@ -1128,6 +1132,85 @@ class LazySMemory(SMemory):
         #
         # return addr
 
+    def mmapFile(self, addr, size, perms, filename, offset=0):
+        '''
+        Creates a new file mapping in the memory address space.
+
+        :param addr: the starting address (took as hint). If C{addr} is C{0} the first big enough
+                     chunk of memory will be selected as starting address.
+        :param size: the contents of a file mapping are initialized using C{size} bytes starting
+                     at offset C{offset} in the file C{filename}.
+        :param perms: the access permissions to this memory.
+        :param filename: the pathname to the file to map.
+        :param offset: the contents of a file mapping are initialized using C{size} bytes starting
+                      at offset C{offset} in the file C{filename}.
+        :return: the starting address where the file was mapped.
+        :rtype: int
+        :raises error:
+                   - 'Address shall be concrete' if C{addr} is not an integer number.
+                   - 'Address too big' if C{addr} goes beyond the limit of the memory.
+                   - 'Map already used' if the piece of memory starting in C{addr} and with length C{size} isn't free.
+        '''
+        # If addr is NULL, the system determines where to allocate the region.
+        assert addr is None or isinstance(addr, (int, long)), 'Address shall be concrete'
+        assert addr < self.memory_size, 'Address too big'
+        assert size > 0
+
+        print 'mmap request', hex(addr), size, perms, filename, hex(offset)
+
+        # address is rounded down to the nearest multiple of the allocation granularity
+        if addr is not None:
+            addr = self._floor(addr)
+
+        # size value is rounded up to the next page boundary
+        size = self._ceil(size)
+
+        # If zero search for a spot
+        # addr = self._search(size, addr)
+
+        # It should not be allocated
+        # for i in xrange(self._page(addr), self._page(addr + size)):
+        #     assert i not in self._page2map, 'Map already used'
+
+        print filename
+
+        # with open(filename, 'r') as fileobject:
+        #     fileobject.seek(0, 2)
+        #     file_size = fileobject.tell()
+        #     self._mapped_size = min(size, file_size - offset)
+        #     fdata = mmap(fileobject.fileno(), offset, self._mapped_size)
+
+        # for i, c in enumerate(fdata):
+        #     self.bigarray[addr+i] = c
+
+        with open(filename, 'r') as f:
+            fdata = f.read()
+
+        towrite = min(size, len(fdata[offset:]))
+        print 'towrite', towrite
+        print 'len fdata', len(fdata)
+
+        for i in xrange(towrite):
+            print hex(addr+i), fdata[offset+i].encode('hex')
+            self.bigarray[addr+i:addr+i+1] = fdata[offset+i]
+            print 'x', self.bigarray[addr+i]
+            # from ..core.smtlib import pretty_print
+            # print pretty_print(self.bigarray[addr+i])
+            break
+
+        # Create the map
+        # m = FileMap(addr, size, perms, filename, offset)
+
+        # # Okay, ready to alloc
+        # self._add(m)
+        #
+        # logger.debug('New file-memory map @%x size:%x', addr, size)
+        print 'map at ', hex(addr)
+        return addr
+
+    def access_ok(self, index, access, force=False):
+        return True
+
     def _deref_can_succeed(self, map, address, size):
         if not issymbolic(address):
             return address >= map.start and address + size < map.end
@@ -1151,7 +1234,10 @@ class LazySMemory(SMemory):
 
     def read(self, address, size, force=False):
         page_offset = address
-        return self.bigarray[page_offset:page_offset + size]
+        print 'mem read', hex(address), size
+        ret = self.bigarray[page_offset:page_offset + size]
+        print 'got the ret', ret
+        return ret
 
         # m = self.map_containing(address)
         # if isinstance(m, ArrayMap):
@@ -1162,7 +1248,11 @@ class LazySMemory(SMemory):
 
     def write(self, address, value, force=False):
         page_offset = address
+        # print 'mem write', hex(address), value
+        from ..core.smtlib import pretty_print
+        # print 'pre write', pretty_print(self.bigarray.array)
         self.bigarray[page_offset:page_offset + len(value)] = value
+        # print 'post write', pretty_print(self.bigarray.array)
         return
 
         # m = self.map_containing(address)

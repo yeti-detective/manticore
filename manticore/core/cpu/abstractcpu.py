@@ -754,10 +754,22 @@ class Cpu(Eventful):
         for address in xrange(pc, pc + self.max_instr_width):
             # This reads a byte from memory ignoring permissions
             # and concretize it if symbolic
+            print self.memory
             if not self.memory.access_ok(address, 'x'):
                 break
 
+            print 'going to get c'
+            print 'self memory xx', self.memory
             c = self.memory[address]
+            from ..smtlib import *
+            # print 'aaaaaaaa', pretty_print(self.memory.bigarray.array)
+            print 'got c',c
+
+            print pretty_print(c)
+            print solver.get_all_values(ConstraintSet(), c)
+            print len(solver.get_all_values(ConstraintSet(), c))
+
+            assert 0
 
             if issymbolic(c):
                 assert isinstance(c, BitVec) and c.size == 8
@@ -775,6 +787,7 @@ class Cpu(Eventful):
         # Pad potentially incomplete instruction with zeroes
 
         code = text.ljust(self.max_instr_width, '\x00')
+        print 'got the code', code.encode('hex')
 
         try:
             # decode the instruction from code
@@ -819,6 +832,7 @@ class Cpu(Eventful):
 
         self._publish('will_decode_instruction', self.PC)
 
+        print 'decoding pc', hex(self.PC)
         insn = self.decode_instruction(self.PC)
         self._last_pc = self.PC
 
