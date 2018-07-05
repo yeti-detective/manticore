@@ -830,7 +830,7 @@ class Cpu(Eventful):
 
         self._publish('will_decode_instruction', self.PC)
 
-        print 'decoding pc', hex(self.PC)
+        # print 'decoding pc', hex(self.PC)
         insn = self.decode_instruction(self.PC)
         self._last_pc = self.PC
 
@@ -851,9 +851,9 @@ class Cpu(Eventful):
             implementation = getattr(self, name, None)
 
             if implementation is not None:
-                print 'RAN INSTRUCTION', hex(self.PC)
+                # print 'RAN INSTRUCTION', hex(self.PC)
                 implementation(*insn.operands)
-                print 'RAN INSTRUCTION', hex(self.PC)
+                # print 'RAN INSTRUCTION', hex(self.PC)
 
             else:
                 text_bytes = ' '.join('%02x' % x for x in insn.bytes)

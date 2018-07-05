@@ -115,7 +115,7 @@ class Map(object):
 
     def access_ok(self, access):
         ''' Check if there is enough permissions for access '''
-        print 'xxxx perms', self.perms, 'access', access
+        # print 'xxxx perms', self.perms, 'access', access
         for c in access:
             if c not in self.perms:
                 return False
@@ -467,7 +467,8 @@ class Memory(object):
             self._maps = set()
         else:
             self._maps = set(maps)
-        self._page2map = WeakValueDictionary()  # {page -> ref{MAP}}
+        # self._page2map = WeakValueDictionary()  # {page -> ref{MAP}}
+        self._page2map = dict()  # {page -> ref{MAP}}
         self._recording_stack = []
         for m in self._maps:
             for i in range(self._page(m.start), self._page(m.end)):
@@ -572,6 +573,7 @@ class Memory(object):
         return self._search(size, self.memory_size - size, counter)
 
     def mmapFile(self, addr, size, perms, filename, offset=0):
+
         '''
         Creates a new file mapping in the memory address space.
 
@@ -669,8 +671,10 @@ class Memory(object):
         assert m.start & self.page_mask == 0
         assert m.end & self.page_mask == 0
         self._maps.add(m)
+        print 'hiiaaddd'
         # updating the page to map translation
         for i in range(self._page(m.start), self._page(m.end)):
+            print 'never'
             self._page2map[i] = m
 
     def _del(self, m):
@@ -794,6 +798,8 @@ class Memory(object):
             addr = index.start
             while addr < index.stop:
                 if addr not in self:
+                    print 'ffffffffff', hex(addr)
+                    print self._page2map
                     return False
                 m = self.map_containing(addr)
 
@@ -1097,8 +1103,9 @@ class LazySMemory(SMemory):
     def __reduce__(self):
         return (self.__class__, (self.constraints,), {'backing_array': self.bigarray})
 
-    def __setstate__(self, state):
-        self.bigarray = state['backing_array']
+    # def __setstate__(self, state):
+    #     self.bigarray = state['backing_array']
+    #     super(LazySMemory, self).__setstate__(state)
 
     def __init__(self, constraints, *args, **kwargs):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
@@ -1110,6 +1117,9 @@ class LazySMemory(SMemory):
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, (int, long))
         print 'mmapping', hex(addr)
+        map = AnonMap(addr, size, perms, name)
+        self._add(map)
+        print self._maps
         return addr
 
 
@@ -1163,6 +1173,9 @@ class LazySMemory(SMemory):
 
         print 'mmap request', hex(addr), size, perms, filename, hex(offset)
 
+        map = AnonMap(addr, size, perms)
+        self._add(map)
+
         # address is rounded down to the nearest multiple of the allocation granularity
         if addr is not None:
             addr = self._floor(addr)
@@ -1207,11 +1220,12 @@ class LazySMemory(SMemory):
         # self._add(m)
         #
         # logger.debug('New file-memory map @%x size:%x', addr, size)
+        print self._maps
         print 'map at ', hex(addr)
         return addr
 
-    def access_ok(self, index, access, force=False):
-        return True
+    # def access_ok(self, index, access, force=False):
+    #     return True
 
     def _deref_can_succeed(self, map, address, size):
         if not issymbolic(address):
@@ -1235,6 +1249,9 @@ class LazySMemory(SMemory):
             return found
 
     def read(self, address, size, force=False):
+        if not self.access_ok(slice(address, address + size), 'r', force):
+            raise InvalidMemoryAccess(addr, 'r')
+
         page_offset = address
         # print 'mem read', hex(address), size
         ret = self.bigarray[page_offset:page_offset + size]
@@ -1249,6 +1266,9 @@ class LazySMemory(SMemory):
         #     return super(SMemory, self).read(address, size, force)
 
     def write(self, address, value, force=False):
+        if not self.access_ok(slice(address, address + len(value)), 'w', force):
+            raise InvalidMemoryAccess(address, 'w')
+
         page_offset = address
         # print 'mem write', hex(address), value
         from ..core.smtlib import pretty_print
