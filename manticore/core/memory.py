@@ -1101,7 +1101,7 @@ class LazySMemory(SMemory):
     '''
 
     def __reduce__(self):
-        return (self.__class__, (self.constraints,), {'backing_array': self.bigarray, 'pagemap': self._page2map})
+        return (self.__class__, (self.constraints, self._symbols, self._maps), {'backing_array': self.bigarray, 'pagemap': self._page2map })
 
     def __setstate__(self, state):
         self.bigarray = state['backing_array']
