@@ -1280,7 +1280,7 @@ class LazySMemory(SMemory):
             cs.add(big)
             # state.constrain(big)
 
-        print 'address', address, 'size', size
+        # print 'address', address, 'size', size
         if issymbolic(address):
             # sym access, constrain to maps and continue
             _constrain_to_maps(self.constraints, self.mappings(), address)
