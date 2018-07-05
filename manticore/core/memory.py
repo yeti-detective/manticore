@@ -1249,8 +1249,41 @@ class LazySMemory(SMemory):
             return found
 
     def read(self, address, size, force=False):
-        if not self.access_ok(slice(address, address + size), 'r', force):
-            raise InvalidMemoryAccess(addr, 'r')
+        def _constrain_to_maps(cs, mappings, where):
+            # maps = state.cpu.memory.mappings()
+            maps = mappings
+
+            from manticore.core.smtlib.operators import UGE, ULT, OR
+
+            cons = []
+            print(maps)
+            for map in maps:
+                print(33)
+                start, end = map[:2]
+
+                startcons = UGE(where, start)
+                endcons = ULT(where, end)
+
+                c = startcons & endcons
+                cons.append(c)
+
+                logger.info('map', hex(start), hex(end))
+
+            if len(cons) > 1:
+                big = OR(*cons)
+            else:
+                big = cons[0]
+
+            cs.add(big)
+            # state.constrain(big)
+
+        print 'address', address, 'size', size
+        if issymbolic(address):
+            # sym access, constrain to maps and continue
+            _constrain_to_maps(self.constraints, self.mappings(), address)
+        else:
+            if not self.access_ok(slice(address, address + size), 'r', force):
+                raise InvalidMemoryAccess(address, 'r')
 
         page_offset = address
         # print 'mem read', hex(address), size
