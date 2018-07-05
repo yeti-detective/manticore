@@ -674,7 +674,7 @@ class Memory(object):
         print 'hiiaaddd'
         # updating the page to map translation
         for i in range(self._page(m.start), self._page(m.end)):
-            print 'never'
+            # print 'never'
             self._page2map[i] = m
 
     def _del(self, m):
@@ -782,6 +782,8 @@ class Memory(object):
 
     # Permissions
     def __contains__(self, address):
+        # print 'checking address in self page2map', len(self._page2map)
+        # print 'checking address in self page2map', self._page2map
         return self._page(address) in self._page2map
 
     def perms(self, index):
@@ -812,9 +814,10 @@ class Memory(object):
             return True
         else:
             if index not in self:
+                # print 'index not in self ret false'
                 return False
             m = self.map_containing(index)
-            print 'map cont access ok', m
+            # print 'map cont access ok', m
             return force or m.access_ok(access)
 
     # write and read potentially symbolic bytes at symbolic indexes
