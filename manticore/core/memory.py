@@ -1236,6 +1236,7 @@ class LazySMemory(SMemory):
     def write(self, address, value, force=False):
         if issymbolic(address):
             # TODO FIXME what do we do here?
+            pass
         else:
             if not self.access_ok(slice(address, address + len(value)), 'w', force):
                 raise InvalidMemoryAccess(address, 'w')
