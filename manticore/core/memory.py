@@ -1209,6 +1209,10 @@ class LazySMemory(SMemory):
 
         # print 'address', address, 'size', size
         if issymbolic(address):
+            # TODO FIXME what to do here? constrain to maps and continue?
+            # don't constrain to maps because then we can't distinguish later if a solution isn't SAT because of maps
+            # or because of the actual code
+
             # sym access, constrain to maps and continue
             pass
             # _constrain_to_maps(self.constraints, self.mappings(), address)
@@ -1230,8 +1234,11 @@ class LazySMemory(SMemory):
         #     return super(SMemory, self).read(address, size, force)
 
     def write(self, address, value, force=False):
-        if not self.access_ok(slice(address, address + len(value)), 'w', force):
-            raise InvalidMemoryAccess(address, 'w')
+        if issymbolic(address):
+            # TODO FIXME what do we do here?
+        else:
+            if not self.access_ok(slice(address, address + len(value)), 'w', force):
+                raise InvalidMemoryAccess(address, 'w')
 
         page_offset = address
         # print 'mem write', hex(address), value
