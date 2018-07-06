@@ -778,8 +778,6 @@ class Memory(object):
 
     # Permissions
     def __contains__(self, address):
-        # print 'checking address in self page2map', len(self._page2map)
-        # print 'checking address in self page2map', self._page2map
         return self._page(address) in self._page2map
 
     def perms(self, index):
@@ -796,8 +794,6 @@ class Memory(object):
             addr = index.start
             while addr < index.stop:
                 if addr not in self:
-                    print 'ffffffffff', hex(addr)
-                    print self._page2map
                     return False
                 m = self.map_containing(addr)
 
@@ -810,10 +806,8 @@ class Memory(object):
             return True
         else:
             if index not in self:
-                # print 'index not in self ret false'
                 return False
             m = self.map_containing(index)
-            # print 'map cont access ok', m
             return force or m.access_ok(access)
 
     # write and read potentially symbolic bytes at symbolic indexes
@@ -1113,10 +1107,8 @@ class LazySMemory(SMemory):
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, (int, long))
-        print 'mmapping', hex(addr)
         map = AnonMap(addr, size, perms, name)
         self._add(map)
-        print self._maps
         return addr
 
     def mmapFile(self, addr, size, perms, filename, offset=0):

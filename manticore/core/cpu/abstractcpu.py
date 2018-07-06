@@ -784,7 +784,6 @@ class Cpu(Eventful):
         # Pad potentially incomplete instruction with zeroes
 
         code = text.ljust(self.max_instr_width, '\x00')
-        print 'got the code', code.encode('hex')
 
         try:
             # decode the instruction from code
@@ -820,7 +819,6 @@ class Cpu(Eventful):
         '''
         Decode, and execute one instruction pointed by register PC
         '''
-        print 'ugh yo'
         if issymbolic(self.PC):
             raise ConcretizeRegister(self, 'PC', policy='ALL')
 
