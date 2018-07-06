@@ -1210,7 +1210,8 @@ class LazySMemory(SMemory):
         # print 'address', address, 'size', size
         if issymbolic(address):
             # sym access, constrain to maps and continue
-            _constrain_to_maps(self.constraints, self.mappings(), address)
+            pass
+            # _constrain_to_maps(self.constraints, self.mappings(), address)
         else:
             if not self.access_ok(slice(address, address + size), 'r', force):
                 raise InvalidMemoryAccess(address, 'r')
