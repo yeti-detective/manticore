@@ -467,10 +467,11 @@ class Memory(object):
             self._maps = set()
         else:
             self._maps = set(maps)
-        # self._page2map = WeakValueDictionary()  # {page -> ref{MAP}}
-        self._page2map = dict()  # {page -> ref{MAP}}
+        self._page2map = WeakValueDictionary()  # {page -> ref{MAP}}
+        # self._page2map = dict()  # {page -> ref{MAP}}
         self._recording_stack = []
         for m in self._maps:
+            print 'populating the page2map', len(self._page2map)
             for i in range(self._page(m.start), self._page(m.end)):
                 assert i not in self._page2map
                 self._page2map[i] = m
@@ -1104,18 +1105,22 @@ class LazySMemory(SMemory):
     '''
 
     def __reduce__(self):
-        return (self.__class__, (self.constraints, self._symbols, self._maps), {'backing_array': self.bigarray, 'pagemap': self._page2map })
+        # return (self.__class__, (self.constraints, self._symbols, self._maps), {'backing_array': self.bigarray, 'pagemap': self._page2map })
+        return (self.__class__, (self.constraints, self._symbols, self._maps), {'backing_array': self.bigarray })
 
     def __setstate__(self, state):
         self.bigarray = state['backing_array']
-        self._page2map = state['pagemap']
+        # self._page2map = state['pagemap']
 
     def __init__(self, constraints, *args, **kwargs):
+        print 'entering the lazysmemoery'
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
         self.bigarray = constraints.new_array(index_bits=self.memory_bit_size)
         # self._add(bigarray)
+        print 'end of the ctor!! the pagemap'
+        print self._page2map, len(self._page2map)
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, (int, long))
