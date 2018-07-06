@@ -115,7 +115,6 @@ class Map(object):
 
     def access_ok(self, access):
         ''' Check if there is enough permissions for access '''
-        # print 'xxxx perms', self.perms, 'access', access
         for c in access:
             if c not in self.perms:
                 return False
@@ -670,10 +669,8 @@ class Memory(object):
         assert m.start & self.page_mask == 0
         assert m.end & self.page_mask == 0
         self._maps.add(m)
-        print 'hiiaaddd'
         # updating the page to map translation
         for i in range(self._page(m.start), self._page(m.end)):
-            # print 'never'
             self._page2map[i] = m
 
     def _del(self, m):
@@ -1107,14 +1104,12 @@ class LazySMemory(SMemory):
 
     def __setstate__(self, state):
         self.bigarray = state['backing_array']
-        # self._page2map = state['pagemap']
 
     def __init__(self, constraints, *args, **kwargs):
         super(LazySMemory, self).__init__(constraints, *args, **kwargs)
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
         # self.bigarray = ArrayMap(0, 2**32 - 1, 'rwx', 32, name='bigarray')
         self.bigarray = constraints.new_array(index_bits=self.memory_bit_size)
-        # self._add(bigarray)
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, (int, long))
@@ -1123,31 +1118,6 @@ class LazySMemory(SMemory):
         self._add(map)
         print self._maps
         return addr
-
-
-        # assert addr is None or isinstance(addr, (int, long)), 'Address must be concrete'
-        # assert addr < self.memory_size, 'Address too big'
-        # assert size > 0
-        #
-        # if addr is not None:
-        #     addr = self._floor(addr)
-        #
-        # size = self._ceil(size)
-        #
-        # addr = self._search(size, addr)
-        #
-        # # It should not be allocated
-        # for i in xrange(self._page(addr), self._page(addr + size)):
-        #     if i in self._page2map:
-        #         raise MemoryException("Can't mmap; map already used", addr)
-        #
-        # m = ArrayMap(addr, size, perms, self.memory_bit_size, name=name)
-        #
-        # self._add(m)
-        #
-        # logger.debug('New symbolic memory map @{:x} size:{:x}'.format(addr, size))
-        #
-        # return addr
 
     def mmapFile(self, addr, size, perms, filename, offset=0):
         '''
@@ -1173,8 +1143,6 @@ class LazySMemory(SMemory):
         assert addr < self.memory_size, 'Address too big'
         assert size > 0
 
-        print 'mmap request', hex(addr), size, perms, filename, hex(offset)
-
         map = AnonMap(addr, size, perms)
         self._add(map)
 
@@ -1185,49 +1153,17 @@ class LazySMemory(SMemory):
         # size value is rounded up to the next page boundary
         size = self._ceil(size)
 
-        # If zero search for a spot
-        # addr = self._search(size, addr)
-
-        # It should not be allocated
-        # for i in xrange(self._page(addr), self._page(addr + size)):
-        #     assert i not in self._page2map, 'Map already used'
-
-        # print filename
-
-        # with open(filename, 'r') as fileobject:
-        #     fileobject.seek(0, 2)
-        #     file_size = fileobject.tell()
-        #     self._mapped_size = min(size, file_size - offset)
-        #     fdata = mmap(fileobject.fileno(), offset, self._mapped_size)
-
-        # for i, c in enumerate(fdata):
-        #     self.bigarray[addr+i] = c
-
         with open(filename, 'r') as f:
             fdata = f.read()
 
         towrite = min(size, len(fdata[offset:]))
-        # print 'towrite', towrite
-        # print 'len fdata', len(fdata)
 
         for i in xrange(towrite):
-            # print hex(addr+i), fdata[offset+i].encode('hex')
             self.bigarray[addr+i:addr+i+1] = fdata[offset+i]
-            # print 'x', self.bigarray[addr+i]
 
-        # Create the map
-        # m = FileMap(addr, size, perms, filename, offset)
+        logger.debug('New file-memory map @%x size:%x', addr, size)
 
-        # # Okay, ready to alloc
-        # self._add(m)
-        #
-        # logger.debug('New file-memory map @%x size:%x', addr, size)
-        print self._maps
-        print 'map at ', hex(addr)
         return addr
-
-    # def access_ok(self, index, access, force=False):
-    #     return True
 
     def _deref_can_succeed(self, map, address, size):
         if not issymbolic(address):
