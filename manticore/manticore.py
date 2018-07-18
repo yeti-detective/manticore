@@ -479,7 +479,7 @@ class Manticore(Eventful):
 
     def _hook_callback(self, state, pc, instruction):
         'Invoke all registered generic hooks'
-        print 'hi im heree'
+        # print 'hi im heree'
 
         # Ignore symbolic pc.
         # TODO(yan): Should we ask the solver if any of the hooks are possible,
@@ -493,7 +493,7 @@ class Manticore(Eventful):
 
         # Invoke all pc-agnostic hooks
         for cb in self._hooks.get(None, []):
-            print 'pc agnostics', cb
+            # print 'pc agnostics', cb
             cb(state)
 
     ############################################################################
