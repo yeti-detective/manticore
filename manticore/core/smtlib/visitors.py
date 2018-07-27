@@ -692,6 +692,159 @@ def translate_to_smtlib(expression, **kwargs):
     return translator.result
 
 
+import z3
+class TranslatorPyz3(Visitor):
+    ''' Simple visitor to translate an expression to its pyz3 representation
+    '''
+    translation_table = {    
+        BitVecShiftLeft: 'bvshl',
+        BitVecShiftRight: 'bvlshr',
+        BitVecOr: 'bvor',
+        BitVecXor: 'bvxor',
+        BitVecNot: 'bvnot',
+        BitVecNeg: 'bvneg',
+        LessThan: 'bvslt',
+        LessOrEqual: 'bvsle',
+        GreaterThan: 'bvsgt',
+        GreaterOrEqual: 'bvsge',
+        BitVecSignExtend: '(_ sign_extend %d)',
+    }
+
+    def __init__(self, context=None, **kw):
+        super(TranslatorPyz3, self).__init__(**kw)
+        if context is None:
+            context = z3.Context()
+        self._context = context
+        self._bindings = []
+
+    def visit_BitVecConstant(self, expression):
+        return z3.BitVecVal(expression.value, expression.size, ctx=self._context)
+
+    def visit_BoolConstant(self, expression):
+        return z3.BoolVal(expression.value, ctx=self._context)
+
+    def visit_BoolVariable(self, expression):
+        return z3.Bool(expression.name, ctx=self._context)
+
+    def visit_BitVecVariable(self, expression):
+        return z3.BitVec(expression.name, expression.size, ctx=self._context)
+
+    def visit_ArrayVariable(self, expression):
+        return z3.Array(expression.name, z3.BitVecSort(expression.index_bits, ctx=self._context), z3.BitVecSort(expression.value_bits, ctx=self._context))
+
+    def visit_ArraySelect(self, expression, *operands):
+        return z3.Select(operands[0], operands[1])
+
+    def visit_ArrayStore(self, expression, *operands):
+        return z3.Store(operands[0], operands[1], operands[2])
+
+    def visit_Equal(self, expression, *operands):
+        return operands[0] == operands[1]
+
+    def visit_BoolAnd(self, expression, *operands):
+        return z3.And(operands[0], operands[1], self._context)
+
+    def visit_BoolOr(self, expression, *operands):
+        return z3.OR(operands[0], operands[1], self._context)
+
+    def visit_BoolEq(self, expression, *operands):
+        return operands[0] == operands[1]
+ 
+    def visit_BitVecAnd(self, expression, *operands):
+        return operands[0] & operands[1]
+
+    def visit_BitVecITE(self, expression, *operands):
+        return z3.If(*operands, ctx=self._context)
+
+    def visit_BoolITE(self, expression, *operands):
+        return z3.If(*operands, ctx=self._context)
+
+    def visit_BoolNot(self, expression, *operands):
+        return z3.Not(*operands)
+
+    def visit_BitVecAdd(self, expression, *operands):
+        return operands[0] + operands[1]
+
+    def visit_BitVecSub(self, expression, *operands):
+        return operands[0] - operands[1]
+
+    def visit_BitVecMul(self, expression, *operands):
+        return operands[0] * operands[1]
+
+    def visit_BitVecDiv(self, expression, *operands):
+        return operands[0] / operands[1]
+
+    def visit_BitVecArithmeticShiftLeft(self, expression, *operands):
+        return operands[0] << operands[1]
+
+    def visit_BitVecArithmeticShiftRight(self, expression, *operands):
+        return operands[0] >> operands[1]
+
+    def visit_LessThan(self, expression, *operands):
+        return operands[0] < operands[1]
+
+    def visit_BitVecZeroExtend(self, expression, *operands):
+        return z3.ZeroExt(expression.extend, operands[0])
+
+    def visit_BitVecExtract(self, expression, *operands):
+        return z3.Extract(expression.end, expression.begining, operands[0])
+
+    def visit_BitVecConcat(self, expression, *operands):
+        print "!!!!!!!!!!!concat", expression, operands
+        return z3.Concat(*operands)
+
+    def visit_BitVecUnsignedDiv(self, expression, *operands):
+        return z3.UDiv(*operands)
+
+    def visit_UnsignedGreaterOrEqual(self, expression, *operands):
+        return z3.UGE(*operands)
+
+    def visit_UnsignedLessThan(self, expression, *operands):
+        return z3.ULT(*operands)
+
+    def visit_UnsignedLessOrEqual(self, expression, *operands):
+        return z3.ULE(*operands)
+
+    def visit_UnsignedGreaterThan(self, expression, *operands):
+        return z3.UGT(*operands)
+
+    def visit_BitVecUnsignedRem(self, expression, *operands):
+        return z3.URem(*operands)
+
+    def visit_BitVecRem(self, expression, *operands):
+        return z3.SRem(*operands)
+
+    def visit_BoolOr(self, expression, *operands):
+        return z3.Or(*operands)
+
+    def visit_BoolXor(self, expression, *operands):
+        return z3.Xor(*operands)
+
+    def visit_BitVecMod(self, expression, *operands):
+        return operands[0] % operands[1]
+
+    def visit_Operation(self, expression, *operands):
+        print "ERROR", expression,type(expression), operands
+        try:
+            operation = self.translation_table[type(expression)]
+            x = getattr(z3, operation)(*operands)
+            assert x is not None
+            return x
+        except:
+            print "ERROR", expression,type(expression), operands
+            raise
+
+    @property
+    def results(self):
+        return self._stack
+
+
+    @property
+    def result(self):
+        output = super(TranslatorPyz3, self).result
+        return output
+
+
 class Replace(Visitor):
     ''' Simple visitor to replaces expresions '''
 
