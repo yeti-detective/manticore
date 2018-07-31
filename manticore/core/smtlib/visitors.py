@@ -61,8 +61,8 @@ class Visitor(object):
             methodname = 'visit_%s' % sort
             if hasattr(self, methodname):
                 value = getattr(self, methodname)(expression, *args)
-                if value is not None:
-                    assert isinstance(value, Expression)
+                if value is not None:                    
+                    assert isinstance(value, Expression), "You may want to use Translator class instead of plain Visitor"
                     return value
         return self._rebuild(expression, args)
 
@@ -693,7 +693,7 @@ def translate_to_smtlib(expression, **kwargs):
 
 
 import z3
-class TranslatorPyz3(Visitor):
+class TranslatorPyz3(Translator):
     ''' Simple visitor to translate an expression to its pyz3 representation
     '''
     translation_table = {    
@@ -703,11 +703,6 @@ class TranslatorPyz3(Visitor):
         BitVecXor: 'bvxor',
         BitVecNot: 'bvnot',
         BitVecNeg: 'bvneg',
-        LessThan: 'bvslt',
-        LessOrEqual: 'bvsle',
-        GreaterThan: 'bvsgt',
-        GreaterOrEqual: 'bvsge',
-        BitVecSignExtend: '(_ sign_extend %d)',
     }
 
     def __init__(self, context=None, **kw):
@@ -716,6 +711,10 @@ class TranslatorPyz3(Visitor):
             context = z3.Context()
         self._context = context
         self._bindings = []
+
+
+    def visit_BitVecSignExtend(self, expression, *operands):
+        return z3.ZeroExt(expression.extend, operands[0])
 
     def visit_BitVecConstant(self, expression):
         return z3.BitVecVal(expression.value, expression.size, ctx=self._context)
@@ -745,7 +744,7 @@ class TranslatorPyz3(Visitor):
         return z3.And(operands[0], operands[1], self._context)
 
     def visit_BoolOr(self, expression, *operands):
-        return z3.OR(operands[0], operands[1], self._context)
+        return z3.OR(operands[0], operands[1], ctx=self._context)
 
     def visit_BoolEq(self, expression, *operands):
         return operands[0] == operands[1]
@@ -790,11 +789,13 @@ class TranslatorPyz3(Visitor):
         return z3.Extract(expression.end, expression.begining, operands[0])
 
     def visit_BitVecConcat(self, expression, *operands):
-        print "!!!!!!!!!!!concat", expression, operands
         return z3.Concat(*operands)
 
     def visit_BitVecUnsignedDiv(self, expression, *operands):
         return z3.UDiv(*operands)
+
+    def visit_BitVecSignedDiv(self, expression, *operands):
+        return z3.SDiv(*operands)
 
     def visit_UnsignedGreaterOrEqual(self, expression, *operands):
         return z3.UGE(*operands)
@@ -823,15 +824,30 @@ class TranslatorPyz3(Visitor):
     def visit_BitVecMod(self, expression, *operands):
         return operands[0] % operands[1]
 
+    def visit_BitVecNeg(self, expression, *operands):
+        return - operands[0] 
+
+    def visit_GreaterOrEqual(self, expression, *operands):
+        return operands[0] >= operands[1]
+
+    def visit_GreaterThan(self, expression, *operands):
+        return operands[0] > operands[1]
+
+    def visit_LessOrEqual(self, expression, *operands):
+        return operands[0] <= operands[1]
+
+    def visit_LessThan(self, expression, *operands):
+        return operands[0] <= operands[1]
+
     def visit_Operation(self, expression, *operands):
-        print "ERROR", expression,type(expression), operands
+        print ("ERROR", expression,type(expression), operands)
         try:
             operation = self.translation_table[type(expression)]
             x = getattr(z3, operation)(*operands)
             assert x is not None
             return x
-        except:
-            print "ERROR", expression,type(expression), operands
+        except Exception as e:
+            print ("ERROR", expression,type(expression), operands, e)
             raise
 
     @property

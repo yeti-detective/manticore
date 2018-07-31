@@ -510,4 +510,163 @@ class Z3Solver(Solver):
         raise NotImplementedError("get_value only implemented for Bool and BitVec")
 
 
-solver = Z3Solver()
+import z3
+from .visitors import TranslatorPyz3
+class PyZ3Solver(Solver):
+    def __init__(self):
+        pass
+
+    def _translate_constraints(self, constraints, context=None):
+        if context is None:
+            context = z3.Context()
+        translator = TranslatorPyz3(context=context)
+        for expression in constraints:
+            translator.visit(expression)
+        return translator.results
+
+    def _translate_expression(self, expression, context=None):
+        if context is None:
+            context = z3.Context()
+        translator = TranslatorPyz3(context=context)
+        translator.visit(expression)    
+        return translator.result
+
+    def optimize(self, constraints, expression, operation, M=10000):
+        ''' Iterativelly finds the maximum or minimal value for the operation
+            (Normally Operators.UGT or Operators.ULT)
+            :param X: a symbol or expression
+            :param M: maximum number of iterations allowed
+        '''
+        context = z3.Context()
+        pyz3_constraints = self._translate_constraints(constraints, context=context)
+        pyz3_solver = z3.Optimize(ctx=context)
+        for constraint in pyz3_constraints:
+            pyz3_solver.add(constraint)
+        pyz3_expression = self._translate_expression(expression, context=context)
+
+        if operation is Operators.UGT:
+            h = pyz3_solver.maximize(pyz3_expression)
+            if pyz3_solver.check() != z3.sat:
+                raise Exception("Unfeasible constraints")
+            return pyz3_solver.upper(h).as_long()
+        else:
+            h = pyz3_solver.minimize(pyz3_expression)
+            if pyz3_solver.check() != z3.sat:
+                raise Exception("Unfeasible constraints")
+            return pyz3_solver.lower(h).as_long()
+
+
+    def check(self, constraints):
+        ''' Check if expression can be valid '''
+        return self.can_be_true(constraints, True)
+
+    def can_be_true(self, constraints, expression):
+        ''' Check if expression can be valid '''
+        if isinstance(expression, bool):
+            if not expression:
+                return False
+            else:
+                expression = Bool(False)
+        assert isinstance(expression, Bool)
+
+
+        context = z3.Context()
+        pyz3_constraints = self._translate_constraints(constraints, context=context)
+        pyz3_solver = z3.Solver(ctx=context)
+        for constraint in pyz3_constraints:
+            pyz3_solver.add(constraint)
+        pyz3_expression = self._translate_expression(expression, context=context)
+        pyz3_solver.add(pyz3_expression)
+        return pyz3_solver.check() == z3.sat
+
+    def get_all_values(self, constraints, expression, maxcnt=10000, silent=False):
+        ''' Returns a list with all the possible values for the symbol x'''
+        if not isinstance(expression, Expression):
+            return [expression]
+        assert isinstance(constraints, ConstraintSet)
+        assert isinstance(expression, Expression)
+        context = z3.Context()
+
+        if isinstance(expression, Bool):
+            var = z3.Bool('R', ctx=context)
+        elif isinstance(expression, BitVec):
+            var = z3.BitVec('R', expression.size, ctx=context)
+        else:
+            raise NotImplementedError("get_all_values only implemted for Bool and BitVec")
+
+        pyz3_constraints = self._translate_constraints(constraints, context=context)
+        pyz3_solver = z3.Solver(ctx=context)
+        for constraint in pyz3_constraints:
+            pyz3_solver.add(constraint)
+
+        pyz3_expression = self._translate_expression(expression, context=context)
+        pyz3_solver.add(pyz3_expression == var)
+
+        solutions = []
+        while pyz3_solver.check() == z3.sat:
+            if len(solutions) == maxcnt:
+                if silent:
+                    break
+                else:
+                    raise Exception("Too many solutions")
+            sol = pyz3_solver.model()[var]
+            if isinstance(expression, BitVec):
+                solutions.append(sol.as_long())
+            else:
+                solutions.append(bool(sol))
+            pyz3_solver.add(var != sol) # prevent next 
+        return solutions
+
+    def get_value(self, constraints, expression):
+        ''' Ask the solver for one possible assignment for expression using current set
+            of constraints.
+            The current set of assertions must be sat.
+            :param val: an expression or symbol '''
+        context = z3.Context()
+        if isinstance(expression, Bool):
+            var = z3.Bool('R', ctx=context)
+        elif isinstance(expression, BitVec):
+            var = z3.BitVec('R', expression.size, ctx=context)
+        else:
+            print (type(expression))
+            raise NotImplementedError("get_all_values only implemted for Bool and BitVec")
+
+        pyz3_constraints = self._translate_constraints(constraints, context=context)
+        pyz3_solver = z3.Solver(ctx=context)
+        for constraint in pyz3_constraints:
+            pyz3_solver.add(constraint)
+
+        pyz3_expression = self._translate_expression(expression, context=context)
+        pyz3_solver.add(pyz3_expression == var)
+        if pyz3_solver.check() != z3.sat:
+            raise Exception("Not feasible")
+        return pyz3_solver.model()[var].as_long()
+
+    def max(self, constraints, X, M=10000):
+        ''' Iterativelly finds the maximum value for a symbol.
+            :param X: a symbol or expression
+            :param M: maximum number of iterations allowed
+        '''
+        assert isinstance(X, BitVec)
+        return self.optimize(constraints, X, 'maximize')
+
+    def min(self, constraints, X, M=10000):
+        ''' Iterativelly finds the minimum value for a symbol.
+            :param X: a symbol or expression
+            :param M: maximum number of iterations allowed
+        '''
+        assert isinstance(X, BitVec)
+        return self.optimize(constraints, X, 'minimize')
+
+    def minmax(self, constraints, x, iters=10000):
+        ''' Returns the min and max possible values for x. '''
+        if issymbolic(x):
+            m = self.min(constraints, x, iters)
+            M = self.max(constraints, x, iters)
+            return m, M
+        else:
+            return x, x
+
+
+#solver = Z3Solver()
+solver = PyZ3Solver()
