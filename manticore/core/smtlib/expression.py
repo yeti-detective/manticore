@@ -810,7 +810,7 @@ class ArrayProxy(Array):
         self.written.add(index)
         auxiliar = self._array.store(index, value)
         self._array = auxiliar
-        return auxiliar
+        return self
 
     def _fix_index(self, index):
         """
