@@ -1135,6 +1135,7 @@ class LazySMemory(SMemory):
         assert addr < self.memory_size, 'Address too big'
         assert size > 0
 
+        # FIXME: is this a bug? should we do the floor/ceil stuff before _add ?
         map = AnonMap(addr, size, perms)
         self._add(map)
 
@@ -1148,10 +1149,20 @@ class LazySMemory(SMemory):
         with open(filename, 'r') as f:
             fdata = f.read()
 
-        towrite = min(size, len(fdata[offset:]))
 
-        for i in xrange(towrite):
-            self.bigarray[addr+i:addr+i+1] = fdata[offset+i]
+        will_be_written = fdata[offset:]  # get data starting from the offset
+        will_be_written_padded = will_be_written.ljust(size, '\0')  # in case the size is larger, pad with 0's to fill the size. in case size is smaller do nothing.
+        will_be_written_padded_truncated = will_be_written_padded[:size] # truncate to the size
+
+        # write every thing in this to memory. it is guaranteed to be exactly size in length.
+        for i in range(len(will_be_written_padded_truncated)):
+            self.bigarray[addr+i:addr+i+1] = fdata[i]
+
+        #
+        # towrite = min(size, len(fdata[offset:]))
+        #
+        # for i in xrange(towrite):
+        #     self.bigarray[addr+i:addr+i+1] = fdata[offset+i]
 
         logger.debug('New file-memory map @%x size:%x', addr, size)
 
