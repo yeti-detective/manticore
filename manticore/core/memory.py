@@ -1150,15 +1150,15 @@ class LazySMemory(SMemory):
             fdata = f.read()
 
 
-        will_be_written = fdata[offset:]  # get data starting from the offset
-        will_be_written_padded = will_be_written.ljust(size, '\0')  # in case the size is larger, pad with 0's to fill the size. in case size is smaller do nothing.
-        will_be_written_padded_truncated = will_be_written_padded[:size] # truncate to the size
+        # this worked
+        fdata = fdata[offset:]
+        fdata = fdata.ljust(size, '\0')
 
-        # write every thing in this to memory. it is guaranteed to be exactly size in length.
-        for i in range(len(will_be_written_padded_truncated)):
+        for i in xrange(size):
             self.bigarray[addr+i:addr+i+1] = fdata[i]
 
-        #
+
+        # original
         # towrite = min(size, len(fdata[offset:]))
         #
         # for i in xrange(towrite):
