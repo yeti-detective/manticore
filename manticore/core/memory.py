@@ -4,6 +4,7 @@ from .smtlib import *
 import logging
 from ..utils.mappings import mmap, munmap
 from ..utils.helpers import issymbolic
+import functools
 
 logger = logging.getLogger(__name__)
 
@@ -1130,7 +1131,7 @@ class LazySMemory(SMemory):
 
     def mmap(self, addr, size, perms, name=None, **kwargs):
         assert isinstance(addr, int)
-        map = AnonMap(addr, size, perms, name)
+        map = AnonMap(addr, size, perms, name=name)
         self._add(map)
         return addr
 
@@ -1288,6 +1289,23 @@ class LazySMemory(SMemory):
         # else:
         #     return super(SMemory, self).write(address, value, force)
 
+    def _map_deref_expr(self, map, address, size):
+        return Operators.AND(
+            # address >= map.start,
+            # address + size < map.end)
+            Operators.UGE(address, map.start),
+            Operators.ULT(address, map.end))
+
+    def valid_ptr(self, address):
+        assert issymbolic(address)
+
+        expressions = [self._map_deref_expr(m, address, 1) for m in self._maps]
+        valid = functools.reduce(Operators.OR, expressions)
+
+        return valid
+
+    def invalid_ptr(self, address):
+        return Operators.NOT(self.valid_ptr(address))
 
 
 class Memory32(Memory):
