@@ -148,8 +148,8 @@ class Z3Solver(Solver):
             logger.debug(' Please install Z3 4.4.1 or newer to get optimization support')
 
         # self._command = 'z3 -t:240000 -memory:16384 -smt2 -in'  # original
-        minutes = 120
-        self._command = 'z3 -t:{} -memory:16384 -smt2 -in'.format(minutes * 60 * 1000)
+        minutes = 17
+        self._command = 'z3 -t:{} -memory:16384 -smt2 -in'.format(int(minutes * 60 * 1000))
         self._init = ['(set-logic QF_AUFBV)', '(set-option :global-decls false)']
         self._get_value_fmt = (re.compile('\(\((?P<expr>(.*))\ #x(?P<value>([0-9a-fA-F]*))\)\)'), 16)
 
@@ -289,7 +289,7 @@ class Z3Solver(Solver):
         _status = self._recv()
         logger.debug("Check took %s seconds (%s)", time.time() - start, _status)
         if _status not in ('sat', 'unsat', 'unknown'):
-            raise SolverException(_status)
+            raise SolverException(_status if len(_status) > 0 else "Empty Response")
         if consider_unknown_as_unsat:
             if _status == 'unknown':
                 logger.info('Found an unknown core, probably a solver timeout')

@@ -89,7 +89,7 @@ class LazyMemoryTest(unittest.TestCase):
 
         self.assertEqual(solver.get_all_values(cs, mem[0x1000]), [0])
 
-    @unittest.skip("Disabled because it takes 4+ minutes; get_all_values() isn't returning all possible addresses")
+    # @unittest.skip("Disabled because it takes 4+ minutes; get_all_values() isn't returning all possible addresses")
     def test_lazysymbolic_constrained_deref(self):
         cs = ConstraintSet()
         mem = LazySMemory32(cs)
@@ -100,7 +100,7 @@ class LazyMemoryTest(unittest.TestCase):
         Constant = 0x48
         ConstantMask = 0xff
 
-        if False:
+        if True:
             mem.page_bit_size = 10
             Size = 0x800
             PatternSize = 0x80
@@ -112,25 +112,32 @@ class LazyMemoryTest(unittest.TestCase):
         # Fill with increasing bytes
         mem.write(first, bytes(islice(cycle(range(PatternSize)), Size)))
 
+        # Create a symbolic pointer
         sym = cs.new_bitvec(32)
         cs.add(mem.valid_ptr(sym, 1))
 
-        vals = mem.read(sym, 4)
+        # Vals describes a symbolic read
+        vals = mem.read(sym, 2)
         # print("sym:")
         # print(translate_to_smtlib(sym))
 
+        # Our symbolic pointer should point to something equal to the constant
         cs.add(vals[0] == Constant)
         cs.add(vals[1] == (Constant+1))
 
         # print("\nvals:")
         # print(translate_to_smtlib(cs))
 
+        # Solve for all the pointers that fit the previous constraints
         possible_addrs = solver.get_all_values(cs, sym)
+
         print("possible addrs: ", [hex(a) for a in sorted(possible_addrs)])
+
+        # Make sure the addresses are correct
         for i in possible_addrs:
             self.assertTrue((i & ConstantMask) == Constant)
 
-        # There are 16 spans with 0x48 in [0x1000, 0x2000]
+        # There are 16 spans with 0x48 in [0x1000, 0x2000]. Make sure we're finding all of them.
         self.assertEqual(len(possible_addrs), Size // PatternSize)
 
 if __name__ == '__main__':
