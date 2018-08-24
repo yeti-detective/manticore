@@ -55,7 +55,7 @@ class LazyMemoryTest(unittest.TestCase):
             vals = solver.get_all_values(new_cs, addr)
             self.assertGreater(len(vals), 0)
             for v in vals:
-                print(v)
+                # print(v)
                 self.assertTrue(0 <= v < 4096)
 
         # Ensure that all invalid derefs are outside of mapped memory
@@ -90,16 +90,18 @@ class LazyMemoryTest(unittest.TestCase):
         self.assertEqual(solver.get_all_values(cs, mem[0x1000]), [0])
 
     # @unittest.skip("Disabled because it takes 4+ minutes; get_all_values() isn't returning all possible addresses")
-    def test_lazysymbolic_constrained_deref(self):
+    def test_zlazysymbolic_constrained_deref(self):
+        solver._reset()
         cs = ConstraintSet()
         mem = LazySMemory32(cs)
-        mem.page_bit_size = 6
 
-        Size = 0x40
-        PatternSize = 0x10
-        Constant = 0x8
+        mem.page_bit_size = 12
+        Size = 0x1000
+        PatternSize = 0x100
+        Constant = 0x48
+        ConstantMask = 0xff
 
-        first = mem.mmap(0x0, Size, 'rw')
+        first = mem.mmap(Size, Size, 'rw')
 
         # Fill with increasing bytes
         mem.write(first, bytes(islice(cycle(range(PatternSize)), Size)))
@@ -109,15 +111,14 @@ class LazyMemoryTest(unittest.TestCase):
         cs.add(mem.valid_ptr(sym, 1))
 
         # Vals describes a symbolic read
-        vals = mem.read(sym, 1)
-        print("\nsym:", translate_to_smtlib(sym))
+        vals = mem.read(sym, 2)
+        # print("\nsym:", translate_to_smtlib(sym))
 
         # Our symbolic pointer should point to something equal to the constant
         cs.add(vals[0] == Constant)
-        # cs.add(vals[1] == (Constant+1))
+        cs.add(vals[1] == (Constant+1))
 
-        print("\nOriginal Constraints:")
-        # print(cs)
+        # print("\nOriginal Constraints:\n", cs)
 
         # Solve for all the pointers that fit the previous constraints
         possible_addrs = solver.get_all_values(cs, sym)
@@ -125,7 +126,7 @@ class LazyMemoryTest(unittest.TestCase):
 
         # Make sure the addresses are correct
         for i in possible_addrs:
-            self.assertTrue((i & 0xf) == Constant)
+            self.assertTrue((i & ConstantMask) == Constant)
 
         # There are 16 spans with 0x48 in [0x1000, 0x2000]. Make sure we're finding all of them.
         self.assertEqual(len(possible_addrs), Size // PatternSize)
