@@ -93,21 +93,13 @@ class LazyMemoryTest(unittest.TestCase):
     def test_lazysymbolic_constrained_deref(self):
         cs = ConstraintSet()
         mem = LazySMemory32(cs)
+        mem.page_bit_size = 6
 
-        mem.page_bit_size = 12
-        Size = 0x1000
-        PatternSize = 0x100
-        Constant = 0x48
-        ConstantMask = 0xff
+        Size = 0x40
+        PatternSize = 0x10
+        Constant = 0x8
 
-        if True:
-            mem.page_bit_size = 10
-            Size = 0x800
-            PatternSize = 0x80
-            Constant = 0x48
-            ConstantMask = 0xff
-
-        first = mem.mmap(Size, Size, 'rw')
+        first = mem.mmap(0x0, Size, 'rw')
 
         # Fill with increasing bytes
         mem.write(first, bytes(islice(cycle(range(PatternSize)), Size)))
@@ -117,25 +109,23 @@ class LazyMemoryTest(unittest.TestCase):
         cs.add(mem.valid_ptr(sym, 1))
 
         # Vals describes a symbolic read
-        vals = mem.read(sym, 2)
-        # print("sym:")
-        # print(translate_to_smtlib(sym))
+        vals = mem.read(sym, 1)
+        print("\nsym:", translate_to_smtlib(sym))
 
         # Our symbolic pointer should point to something equal to the constant
         cs.add(vals[0] == Constant)
-        cs.add(vals[1] == (Constant+1))
+        # cs.add(vals[1] == (Constant+1))
 
-        # print("\nvals:")
-        # print(translate_to_smtlib(cs))
+        print("\nOriginal Constraints:")
+        # print(cs)
 
         # Solve for all the pointers that fit the previous constraints
         possible_addrs = solver.get_all_values(cs, sym)
-
         print("possible addrs: ", [hex(a) for a in sorted(possible_addrs)])
 
         # Make sure the addresses are correct
         for i in possible_addrs:
-            self.assertTrue((i & ConstantMask) == Constant)
+            self.assertTrue((i & 0xf) == Constant)
 
         # There are 16 spans with 0x48 in [0x1000, 0x2000]. Make sure we're finding all of them.
         self.assertEqual(len(possible_addrs), Size // PatternSize)

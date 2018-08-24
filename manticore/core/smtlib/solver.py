@@ -148,7 +148,7 @@ class Z3Solver(Solver):
             logger.debug(' Please install Z3 4.4.1 or newer to get optimization support')
 
         # self._command = 'z3 -t:240000 -memory:16384 -smt2 -in'  # original
-        minutes = 17
+        minutes = 0.25
         self._command = 'z3 -t:{} -memory:16384 -smt2 -in'.format(int(minutes * 60 * 1000))
         self._init = ['(set-logic QF_AUFBV)', '(set-option :global-decls false)']
         self._get_value_fmt = (re.compile('\(\((?P<expr>(.*))\ #x(?P<value>([0-9a-fA-F]*))\)\)'), 16)
@@ -224,7 +224,8 @@ class Z3Solver(Solver):
             # self._proc.stdin.writelines(('(exit)\n',))
             # self._proc.wait()
         except Exception as e:
-            logger.error(str(e))
+            if logger is not None:
+                logger.error(str(e))
             pass
 
     def _reset(self, constraints=None):
@@ -315,7 +316,7 @@ class Z3Solver(Solver):
             return expression
         assert isinstance(expression, Variable)
 
-        self._send('(get-value (%s))' % expression.name)
+        self._send('(get-value ({expression.name}))'.format(expression=expression))
         ret = self._recv()
         assert ret.startswith('((') and ret.endswith('))'), ret
 
@@ -374,11 +375,14 @@ class Z3Solver(Solver):
             temp_cs.add(var == expression)
             self._reset(temp_cs.to_string(related_to=var))
             result = []
-            val = None
             while self._check() == 'sat':
                 value = self._getvalue(var)
                 result.append(value)
-                self._assert(var != value)
+                # If we don't reset the assertions, then `_assert(var != val)` will sometimes cause Z3 to hang.
+                # This probably has something to do with the heuristics used for array traversal. (EH)
+                self._reset(temp_cs)
+                for val in result:
+                    self._assert(var != val)
 
                 if len(result) >= maxcnt:
                     if silent:
