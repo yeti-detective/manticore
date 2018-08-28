@@ -25,7 +25,11 @@ import io
 from ..core.plugin import Plugin
 from functools import reduce
 
-from .detectors import Detector, DetectEnvInstruction, DetectExternalCallAndLeak, DetectReentrancySimple, DetectSelfdestruct, DetectUnusedRetVal, DetectDelegatecall, DetectIntegerOverflow, DetectInvalid, DetectReentrancyAdvanced, DetectUninitializedMemory, DetectUninitializedStorage
+from .detectors import (
+    Detector, DetectEnvInstruction, DetectExternalCallAndLeak, DetectReentrancySimple, DetectSelfdestruct,
+    DetectUnusedRetVal, DetectDelegatecall, DetectIntegerOverflow, DetectInvalid, DetectReentrancyAdvanced,
+    DetectUninitializedMemory, DetectUninitializedStorage, DetectTransactionOrderDependence
+)
 
 logger = logging.getLogger(__name__)
 
