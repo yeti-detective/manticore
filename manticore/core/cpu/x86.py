@@ -1219,7 +1219,10 @@ class X86Cpu(Cpu):
         :param dest: destination operand.
         :param src: source operand.
         '''
+        import ipdb; ipdb.set_trace()
+        print('started w add')
         cpu._ADD(dest, src, carry=False)
+        print('done w add')
 
     def _ADD(cpu, dest, src, carry=False):
         MASK = (1 << dest.size) - 1
@@ -1235,7 +1238,9 @@ class X86Cpu(Cpu):
             cv = Operators.ITEBV(dest.size, cpu.CF, 1, 0)
             to_add = arg1 + cv
 
+        print('add dest write')
         res = dest.write((arg0 + to_add) & MASK)
+        print('done add dest write')
 
         # Affected flags: oszapc
         tempCF = Operators.OR(Operators.ULT(res, arg0 & MASK), Operators.ULT(res, arg1 & MASK))
