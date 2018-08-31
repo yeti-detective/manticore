@@ -1218,16 +1218,25 @@ class LazySMemory(SMemory):
         # it's possible that there will be invliad/unmapped addresses in this range. need to skip to next map if so
         # also need to mark all of these addresses as now in the symbolic store
 
+        accessrange = accessmax - accessmin
+        if accessrange >= 0x10000000:  # random big number
+            raise Exception('range too big for hybrid memory atm')
+
         curr_addr = accessmin
 
+
         while curr_addr <= accessmax:
+            # print('x')
             if curr_addr not in self.backed_by_symbolic_store:
+                # print('xx')
                 try:
                     self.bigarray[curr_addr] = Memory.read(self, curr_addr, 1)[0]
                     self.backed_by_symbolic_store.add(curr_addr)
                 except: # in case of invalid mapping
                     curr_addr = (curr_addr + 0x1000) & ~0xfff
+                    # print('xxx')
                     continue
+
 
             curr_addr += 1
 

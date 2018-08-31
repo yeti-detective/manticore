@@ -1219,7 +1219,7 @@ class X86Cpu(Cpu):
         :param dest: destination operand.
         :param src: source operand.
         '''
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         print('started w add')
         cpu._ADD(dest, src, carry=False)
         print('done w add')
