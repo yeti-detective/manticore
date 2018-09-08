@@ -1945,6 +1945,8 @@ class ManticoreEVM(Manticore):
             :raises NoAliveStates: if there are no alive states to execute
         """
         # print(caller, value, address, data, gas)
+        # logger.info('%x -> %x value:%d %s', int(caller), int(address),value, data)
+        # logger.info('%x -> %x value:%d', int(caller), int(address),value)
         self._transaction('CALL', caller, value=value, address=address, data=data, gaslimit=gas)
 
     def create_account(self, balance=0, address=None, code=None, name=None):
@@ -2133,7 +2135,10 @@ class ManticoreEVM(Manticore):
         import json
         with open(txjsonfile) as f:
             txlist = json.load(f)
-        print(txlist)
+        # print(txlist)
+
+        def cb():
+            pass
 
         def getpeople():
             ppl = {}
@@ -2172,7 +2177,10 @@ class ManticoreEVM(Manticore):
 
         # ok so now the initial state is roughly created
 
-        for tx in txlist[1:]:  # skip the create tx
+        for tx in txlist:
+            if tx['type'] == 'CREATE':
+                continue
+
             tx_from_name = tx['from_name']
             tx_to_name = tx['to_name']
 
@@ -2188,7 +2196,19 @@ class ManticoreEVM(Manticore):
                 'contract0': contract_account,
             }[tx_to_name]
 
-            print('yay tx')
+            # print('yay tx')
+            metadata = self.get_metadata(tx['to_address'])
+            if metadata is not None:
+                calldata = binascii.unhexlify(tx['data'])
+                funcid = calldata[:4]
+                sig = metadata.get_func_signature(funcid)
+                funcname = metadata.get_func_name(funcid)
+                if sig:
+                    _, arguments = ABI.deserialize(sig, calldata)
+                else:
+                    arguments = (calldata,)
+                print(sig, funcname, arguments)
+
             self.transaction(
                 caller=fromm,
                 address=to,
@@ -2196,6 +2216,7 @@ class ManticoreEVM(Manticore):
                 value=tx['value'],
                 gas=tx['gas'],
             )
+            # logger.info("%d alive states, %d terminated states", self.count_running_states(), self.count_terminated_states())
 
 
     def multi_tx_analysis(self, solidity_filename, contract_name=None, tx_limit=None, tx_use_coverage=True, tx_send_ether=True, tx_account="attacker", args=None):
