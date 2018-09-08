@@ -1944,6 +1944,7 @@ class ManticoreEVM(Manticore):
             :param gas: gas budget
             :raises NoAliveStates: if there are no alive states to execute
         """
+        # print(caller, value, address, data, gas)
         self._transaction('CALL', caller, value=value, address=address, data=data, gaslimit=gas)
 
     def create_account(self, balance=0, address=None, code=None, name=None):
@@ -2152,7 +2153,7 @@ class ManticoreEVM(Manticore):
 
                 if to_name not in ppl:
                     ppl[to_name] = to_addr
-                    
+
             return ppl
 
 
@@ -2171,7 +2172,7 @@ class ManticoreEVM(Manticore):
 
         # ok so now the initial state is roughly created
 
-        for tx in txlist:
+        for tx in txlist[1:]:  # skip the create tx
             tx_from_name = tx['from_name']
             tx_to_name = tx['to_name']
 
