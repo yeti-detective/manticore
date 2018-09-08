@@ -2135,10 +2135,11 @@ class ManticoreEVM(Manticore):
         import json
         with open(txjsonfile) as f:
             txlist = json.load(f)
-        # print(txlist)
 
-        def cb():
-            pass
+        def cb(m, state, tx):
+            print(f'-> {tx.result}')
+
+        self.subscribe('did_close_transaction', cb)
 
         def getpeople():
             ppl = {}

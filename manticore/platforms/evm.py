@@ -1652,7 +1652,7 @@ class EVMWorld(Platform):
             self.send_funds(tx.address, tx.caller, tx.value)
 
         # logger.info('-> %s', result)
-        print(f'-> {result}')
+        # print(f'-> {result}')
         tx.set_result(result, data)
         self._transactions.append(tx)
 
