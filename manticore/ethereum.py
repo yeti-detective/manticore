@@ -2179,11 +2179,7 @@ class ManticoreEVM(Manticore):
         # ok so now the initial state is roughly created
 
         for tx in txlist:
-            metadata = self.get_metadata(tx['to_address'])
-
             if tx['type'] == 'CREATE':
-                # if metadata is not None:
-                    
                 continue
 
             tx_from_name = tx['from_name']
@@ -2201,17 +2197,10 @@ class ManticoreEVM(Manticore):
                 'contract0': contract_account,
             }[tx_to_name]
 
-            # print('yay tx')
+            metadata = self.get_metadata(tx['to_address'])
             if metadata is not None:
                 calldata = binascii.unhexlify(tx['data'])
-                funcid = calldata[:4]
-                sig = metadata.get_func_signature(funcid)
-                funcname = metadata.get_func_name(funcid)
-                if sig:
-                    _, arguments = ABI.deserialize(sig, calldata)
-                else:
-                    arguments = (calldata,)
-                print(sig, funcname, arguments)
+                print(metadata.parse_tx(calldata))
 
             self.transaction(
                 caller=fromm,
