@@ -2128,6 +2128,75 @@ class ManticoreEVM(Manticore):
 
         return address
 
+    def txreplay(self, solfile, txjsonfile):
+        import json
+        with open(txjsonfile) as f:
+            txlist = json.load(f)
+        print(txlist)
+
+        def getpeople():
+            ppl = {}
+            for tx in txlist:
+                from_name = tx['from_name']
+                from_addr = tx['from_address']
+
+                to_name = tx['to_name']
+                to_addr = tx['to_address']
+
+
+                # TODO: we assume that the name and the address will always match
+                # each other for all txs
+
+                if from_name not in ppl:
+                    ppl[from_name] = from_addr
+
+                if to_name not in ppl:
+                    ppl[to_name] = to_addr
+                    
+            return ppl
+
+
+
+        ppl = getpeople()
+
+
+        # roughly copypasted from multi tx analysis
+        # NOTE IMPORTANT: the balance must be the same as multi tx analysis
+        # we set the addresses specifically to what is in the tx trace
+        owner_account = self.create_account(balance=1000, name='owner', address=ppl['owner'])
+        attacker_account = self.create_account(balance=1000, name='attacker', address=ppl['attacker'])
+
+        with open(solfile) as f:
+            contract_account = self.solidity_create_contract(f, owner=owner_account)
+
+        # ok so now the initial state is roughly created
+
+        for tx in txlist:
+            tx_from_name = tx['from_name']
+            tx_to_name = tx['to_name']
+
+            fromm = {
+                'owner': owner_account,
+                'attacker': attacker_account,
+                'contract0': contract_account,
+            }[tx_from_name]
+
+            to = {
+                'owner': owner_account,
+                'attacker': attacker_account,
+                'contract0': contract_account,
+            }[tx_to_name]
+
+            print('yay tx')
+            self.transaction(
+                caller=fromm,
+                address=to,
+                data=binascii.unhexlify(tx['data']),
+                value=tx['value'],
+                gas=tx['gas'],
+            )
+
+
     def multi_tx_analysis(self, solidity_filename, contract_name=None, tx_limit=None, tx_use_coverage=True, tx_send_ether=True, tx_account="attacker", args=None):
         owner_account = self.create_account(balance=1000, name='owner')
         attacker_account = self.create_account(balance=1000, name='attacker')

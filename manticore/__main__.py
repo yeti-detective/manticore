@@ -121,6 +121,9 @@ def parse_arguments():
     parser.add_argument('--no-testcases', action='store_true',
                         help='Do not generate testcases for discovered states when analysis finishes (Ethereum only)')
 
+    parser.add_argument('--txreplay', type=str,
+                        help='txreplay json file')
+
     parsed = parser.parse_args(sys.argv[1:])
     if parsed.procs <= 0:
         parsed.procs = 1
@@ -139,6 +142,14 @@ def ethereum_cli(args):
     log.init_logging()
 
     m = ManticoreEVM(procs=args.procs, workspace_url=args.workspace)
+
+    solfile = args.argv[0]
+
+    if args.txreplay:
+        m.txreplay(solfile, args.txreplay)
+        return
+
+
 
     if args.detect_all or args.detect_invalid:
         m.register_detector(DetectInvalid())
