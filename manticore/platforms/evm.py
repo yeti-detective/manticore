@@ -106,6 +106,7 @@ class Transaction(object):
                 raise EVMException('Invalid transaction return_data')
         # if result:
         #     logger.info('-> %s', result)
+        # print(f'-> {result}')
         self._result = result
         self._return_data = return_data
 

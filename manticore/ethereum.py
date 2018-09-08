@@ -2173,12 +2173,17 @@ class ManticoreEVM(Manticore):
         attacker_account = self.create_account(balance=1000, name='attacker', address=ppl['attacker'])
 
         with open(solfile) as f:
+            print('creation')
             contract_account = self.solidity_create_contract(f, owner=owner_account)
 
         # ok so now the initial state is roughly created
 
         for tx in txlist:
+            metadata = self.get_metadata(tx['to_address'])
+
             if tx['type'] == 'CREATE':
+                # if metadata is not None:
+                    
                 continue
 
             tx_from_name = tx['from_name']
@@ -2197,7 +2202,6 @@ class ManticoreEVM(Manticore):
             }[tx_to_name]
 
             # print('yay tx')
-            metadata = self.get_metadata(tx['to_address'])
             if metadata is not None:
                 calldata = binascii.unhexlify(tx['data'])
                 funcid = calldata[:4]
