@@ -104,6 +104,8 @@ class Transaction(object):
         else:
             if return_data is not None:
                 raise EVMException('Invalid transaction return_data')
+        # if result:
+        #     logger.info('-> %s', result)
         self._result = result
         self._return_data = return_data
 
@@ -1648,6 +1650,8 @@ class EVMWorld(Platform):
             self._logs = logs
             self.send_funds(tx.address, tx.caller, tx.value)
 
+        # logger.info('-> %s', result)
+        print(f'-> {result}')
         tx.set_result(result, data)
         self._transactions.append(tx)
 
