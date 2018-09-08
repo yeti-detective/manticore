@@ -2583,76 +2583,118 @@ class ManticoreEVM(Manticore):
             if is_something_symbolic:
                 summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
 
-        # Transactions
-        with testcase.open_stream('tx') as tx_summary:
-            is_something_symbolic = False
-            for tx in blockchain.human_transactions:  # external transactions
-                tx_summary.write("Transactions Nr. %d\n" % blockchain.transactions.index(tx))
+        with testcase.open_stream('tx.json') as tx_json_file:
+            txlist = []
 
-                # The result if any RETURN or REVERT
-                tx_summary.write("Type: %s (%d)\n" % (tx.sort, tx.depth))
-                caller_solution = state.solve_one(tx.caller)
-                caller_name = self.account_name(caller_solution)
-                tx_summary.write("From: %s(0x%x) %s\n" % (caller_name, caller_solution, flagged(issymbolic(tx.caller))))
-                address_solution = state.solve_one(tx.address)
-                address_name = self.account_name(address_solution)
-                tx_summary.write("To: %s(0x%x) %s\n" % (address_name, address_solution, flagged(issymbolic(tx.address))))
-                tx_summary.write("Value: %d %s\n" % (state.solve_one(tx.value), flagged(issymbolic(tx.value))))
-                tx_summary.write("Gas used: %d %s\n" % (state.solve_one(tx.gas), flagged(issymbolic(tx.gas))))
-                tx_data = state.solve_one(tx.data)
-                tx_summary.write("Data: %s %s\n" % (binascii.hexlify(tx_data), flagged(issymbolic(tx.data))))
-                if tx.return_data is not None:
-                    return_data = state.solve_one(tx.return_data)
-                    tx_summary.write("Return_data: %s %s\n" % (binascii.hexlify(return_data), flagged(issymbolic(tx.return_data))))
-                metadata = self.get_metadata(tx.address)
-                if tx.sort == 'CREATE':
-                    if metadata is not None:
-                        args_data = tx.data[len(metadata._init_bytecode):]
-                        arguments = ABI.deserialize(metadata.get_constructor_arguments(), state.solve_one(args_data))
-                        is_argument_symbolic = any(map(issymbolic, arguments))
-                        tx_summary.write('Function call:\n')
-                        tx_summary.write("Constructor(")
-                        tx_summary.write(','.join(map(repr, map(state.solve_one, arguments))))
-                        tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_argument_symbolic)))
+            # Transactions
+            with testcase.open_stream('tx') as tx_summary:
+                is_something_symbolic = False
+                for tx in blockchain.human_transactions:  # external transactions
 
-                if tx.sort == 'CALL':
-                    if metadata is not None:
-                        calldata = state.solve_one(tx.data)
-                        is_calldata_symbolic = issymbolic(tx.data)
+                    txlistentry = {}
 
-                        function_id = calldata[:4]  # hope there is enough data
-                        signature = metadata.get_func_signature(function_id)
-                        function_name = metadata.get_func_name(function_id)
-                        if signature:
-                            _, arguments = ABI.deserialize(signature, calldata)
-                        else:
-                            arguments = (calldata,)
+                    tx_summary.write("Transactions Nr. %d\n" % blockchain.transactions.index(tx))
 
-                        return_data = None
-                        if tx.result == 'RETURN':
-                            ret_types = metadata.get_func_return_types(function_id)
-                            return_data = state.solve_one(tx.return_data)
-                            return_values = ABI.deserialize(ret_types, return_data)  # function return
+                    # The result if any RETURN or REVERT
+                    tx_summary.write("Type: %s (%d)\n" % (tx.sort, tx.depth))
 
-                        is_return_symbolic = issymbolic(tx.return_data)
+                    txlistentry['type'] = tx.sort
 
-                        tx_summary.write('\n')
-                        tx_summary.write("Function call:\n")
-                        tx_summary.write("%s(" % function_name)
-                        tx_summary.write(','.join(map(repr, arguments)))
-                        tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_calldata_symbolic)))
 
-                        if return_data is not None:
-                            if len(return_values) == 1:
-                                return_values = return_values[0]
+                    caller_solution = state.solve_one(tx.caller)
+                    caller_name = self.account_name(caller_solution)
+                    tx_summary.write("From: %s(0x%x) %s\n" % (caller_name, caller_solution, flagged(issymbolic(tx.caller))))
 
-                            tx_summary.write('return: %r %s\n' % (return_values, flagged(is_return_symbolic)))
-                        is_something_symbolic = is_calldata_symbolic or is_return_symbolic
+                    txlistentry['from_name'] = caller_name
+                    txlistentry['from_address'] = caller_solution
 
-                tx_summary.write('\n\n')
 
-            if is_something_symbolic:
-                tx_summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
+
+                    address_solution = state.solve_one(tx.address)
+                    address_name = self.account_name(address_solution)
+                    tx_summary.write("To: %s(0x%x) %s\n" % (address_name, address_solution, flagged(issymbolic(tx.address))))
+
+
+                    concretized_value = state.solve_one(tx.value)
+                    concretized_gas = state.solve_one(tx.gas)
+
+                    tx_summary.write("Value: %d %s\n" % (concretized_value, flagged(issymbolic(tx.value))))
+                    tx_summary.write("Gas used: %d %s\n" % (concretized_gas, flagged(issymbolic(tx.gas))))
+
+                    txlistentry['to_name'] = address_name
+                    txlistentry['to_address'] = address_solution
+
+                    txlistentry['value'] = concretized_value
+                    txlistentry['gas'] = concretized_gas
+
+
+
+                    tx_data = state.solve_one(tx.data)
+                    tx_summary.write("Data: %s %s\n" % (binascii.hexlify(tx_data), flagged(issymbolic(tx.data))))
+
+                    txlistentry['data'] = binascii.hexlify(tx_data).decode()
+
+
+
+                    if tx.return_data is not None:
+                        return_data = state.solve_one(tx.return_data)
+                        tx_summary.write("Return_data: %s %s\n" % (binascii.hexlify(return_data), flagged(issymbolic(tx.return_data))))
+                    metadata = self.get_metadata(tx.address)
+                    if tx.sort == 'CREATE':
+                        if metadata is not None:
+                            args_data = tx.data[len(metadata._init_bytecode):]
+                            arguments = ABI.deserialize(metadata.get_constructor_arguments(), state.solve_one(args_data))
+                            is_argument_symbolic = any(map(issymbolic, arguments))
+                            tx_summary.write('Function call:\n')
+                            tx_summary.write("Constructor(")
+                            tx_summary.write(','.join(map(repr, map(state.solve_one, arguments))))
+                            tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_argument_symbolic)))
+
+                    if tx.sort == 'CALL':
+                        if metadata is not None:
+                            calldata = state.solve_one(tx.data)
+                            is_calldata_symbolic = issymbolic(tx.data)
+
+                            function_id = calldata[:4]  # hope there is enough data
+                            signature = metadata.get_func_signature(function_id)
+                            function_name = metadata.get_func_name(function_id)
+                            if signature:
+                                _, arguments = ABI.deserialize(signature, calldata)
+                            else:
+                                arguments = (calldata,)
+
+                            return_data = None
+                            if tx.result == 'RETURN':
+                                ret_types = metadata.get_func_return_types(function_id)
+                                return_data = state.solve_one(tx.return_data)
+                                return_values = ABI.deserialize(ret_types, return_data)  # function return
+
+                            is_return_symbolic = issymbolic(tx.return_data)
+
+                            tx_summary.write('\n')
+                            tx_summary.write("Function call:\n")
+                            tx_summary.write("%s(" % function_name)
+                            tx_summary.write(','.join(map(repr, arguments)))
+                            tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_calldata_symbolic)))
+
+                            if return_data is not None:
+                                if len(return_values) == 1:
+                                    return_values = return_values[0]
+
+                                tx_summary.write('return: %r %s\n' % (return_values, flagged(is_return_symbolic)))
+                            is_something_symbolic = is_calldata_symbolic or is_return_symbolic
+
+                    tx_summary.write('\n\n')
+
+                    # print(txlistentry)
+                    txlist.append(txlistentry)
+
+                if is_something_symbolic:
+                    tx_summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
+
+            import json
+            # import pdb; pdb.set_trace()
+            tx_json_file.write(json.dumps(txlist))
 
         # logs
         with testcase.open_stream('logs') as logs_summary:
