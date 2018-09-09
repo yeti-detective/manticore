@@ -20,11 +20,14 @@ class ManticoreDebugger(Cmd):
         self.m = ManticoreEVM()
         # Fixme make this a Plugin
         self.m._executor.subscribe('will_evm_execute_instruction', self.will_evm_execute_instruction_callback)
-        self.user_account = self.m.create_account(balance=1000, name='user_account')
-        self.owner_account = self.m.create_account(balance=1000, name='owner_account')
-        self.current_account = self.user_account
+        # self.user_account = self.m.create_account(balance=1000, name='user_account')
+        # self.owner_account = self.m.create_account(balance=1000, name='owner_account')
+        # self.current_account = self.user_account
         self.breakpoints = set() # (address, evmoffset)
         self.current_position = None # (address, evmoffset)
+
+
+        self.txlist = []
 
 
     def will_evm_execute_instruction_callback(self, state, instruction, arguments):
@@ -56,7 +59,96 @@ class ManticoreDebugger(Cmd):
         for state in self.m.all_states:
             return state
 
-    # Commands 
+    # Commands
+    def do_run(self, inp):
+        import binascii
+
+        def cb(m, state, tx):
+            print(f'-> {tx.result}')
+
+        self.m.subscribe('did_close_transaction', cb)
+
+        for tx in self.txlist:
+            if tx['type'] == 'CREATE':
+                continue
+
+            tx_from_name = tx['from_name']
+            tx_to_name = tx['to_name']
+
+            fromm = {
+                'owner': self.owner_account,
+                'attacker': self.attacker_account,
+                'contract0': self.contract_account,
+            }[tx_from_name]
+
+            to = {
+                'owner': self.owner_account,
+                'attacker': self.attacker_account,
+                'contract0': self.contract_account,
+            }[tx_to_name]
+
+            metadata = self.m.get_metadata(tx['to_address'])
+            if metadata is not None:
+                calldata = binascii.unhexlify(tx['data'])
+                print(metadata.parse_tx(calldata))
+
+
+            self.m.transaction(
+                caller=fromm,
+                address=to,
+                data=binascii.unhexlify(tx['data']),
+                value=tx['value'],
+                gas=tx['gas'],
+            )
+            # logger.info("%d alive states, %d terminated states", self.count_running_states(), self.count_terminated_states())
+
+    def do_load(self, inp):
+        # parse the filenmae
+        import json
+        solfile, txjsonfile = inp.split()
+        with open(txjsonfile) as f:
+            txlist = json.load(f)
+            self.txlist = txlist
+
+        def getpeople():
+            ppl = {}
+            for tx in txlist:
+                from_name = tx['from_name']
+                from_addr = tx['from_address']
+
+                to_name = tx['to_name']
+                to_addr = tx['to_address']
+
+
+                # TODO: we assume that the name and the address will always match
+                # each other for all txs
+
+                if from_name not in ppl:
+                    ppl[from_name] = from_addr
+
+                if to_name not in ppl:
+                    ppl[to_name] = to_addr
+
+            return ppl
+
+
+
+        ppl = getpeople()
+
+        # copypastad from txreplay
+        # roughly copypasted from multi tx analysis
+        # NOTE IMPORTANT: the balance must be the same as multi tx analysis
+        # we set the addresses specifically to what is in the tx trace
+        self.owner_account = self.m.create_account(balance=1000, name='owner', address=ppl['owner'])
+
+        self.attacker_account = self.m.create_account(balance=1000, name='attacker', address=ppl['attacker'])
+
+        with open(solfile) as f:
+            # print('creation')
+            self.contract_account = self.m.solidity_create_contract(f, owner=self.owner_account)
+
+        # ok so now the initial state is roughly created
+
     def do_where(self, inp):
         ''' Print the transaction call and evm call stack '''
         address, offset = self.current_position
