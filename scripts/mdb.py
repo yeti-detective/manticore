@@ -29,6 +29,8 @@ class ManticoreDebugger(Cmd):
 
         self.txlist = []
 
+        self.did_run = False
+
 
     def will_evm_execute_instruction_callback(self, state, instruction, arguments):
         ''' Internal breakpoint callback '''
@@ -60,8 +62,18 @@ class ManticoreDebugger(Cmd):
             return state
 
     # Commands
+    def do_EOF(self, inp):
+        import sys
+        sys.exit()
+
     def do_run(self, inp):
         import binascii
+
+        if self.did_run:
+            print('already ran!')
+            return
+
+        self.did_run = True
 
         def cb(m, state, tx):
             print(f'-> {tx.result}')
