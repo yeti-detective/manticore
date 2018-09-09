@@ -1542,22 +1542,36 @@ class ManticoreEVM(Manticore):
         abs_filename = os.path.abspath(source_file.name)
         working_folder, filename = os.path.split(abs_filename)
 
-        solc_invocation = [
-            solc,
-        ]
-        solc_invocation.extend(solc_remaps)
-        solc_invocation.extend([
+        solc_invocation = [solc] + list(solc_remaps) + [
             '--combined-json', 'abi,srcmap,srcmap-runtime,bin,hashes,bin-runtime',
             '--allow-paths', '.',
             filename
-        ])
+        ]
 
         p = Popen(solc_invocation, stdout=PIPE, stderr=PIPE, cwd=working_folder)
         stdout, stderr = p.communicate()
+
+        stdout, stderr = stdout.decode(), stderr.decode()
+
+        # See #1123 - solc fails when run within snap
+        # and https://forum.snapcraft.io/t/interfaces-allow-access-tmp-directory/5129
+        if stdout == '' and '""%s"" is not found' % filename in stderr:
+            raise EthereumError(
+                'Solidity compilation failed with error: {}\n'
+                'Did you install solc from snap Linux universal packages?\n'
+                "If so, the problem is likely due to snap's sandbox restricting access to /tmp\n"
+                '\n'
+                'Here are some potential solutions:\n'
+                ' 1) Remove solc from snap and install it different way\n'
+                ' 2) Reinstall solc from snap in developer mode, so there is no sandbox\n'
+                " 3) Find a way to add /tmp to the solc's sandbox. If you do, "
+                "send us a PR so we could add it here!".format(stderr)
+            )
+
         try:
-            return json.loads(stdout.decode()), stderr.decode()
+            return json.loads(stdout), stderr
         except ValueError:
-            raise EthereumError('Solidity compilation error:\n\n{}'.format(stderr.decode()))
+            raise EthereumError('Solidity compilation error:\n\n{}'.format(stderr))
 
     @staticmethod
     def _compile(source_code, contract_name, libraries=None, solc_bin=None, solc_remaps=[]):
@@ -1946,6 +1960,9 @@ class ManticoreEVM(Manticore):
             :param gas: gas budget
             :raises NoAliveStates: if there are no alive states to execute
         """
+        # print(caller, value, address, data, gas)
+        # logger.info('%x -> %x value:%d %s', int(caller), int(address),value, data)
+        # logger.info('%x -> %x value:%d', int(caller), int(address),value)
         self._transaction('CALL', caller, value=value, address=address, data=data, gaslimit=gas)
 
     def create_account(self, balance=0, address=None, code=None, name=None):
@@ -2129,6 +2146,88 @@ class ManticoreEVM(Manticore):
         self.run(procs=self._config_procs)
 
         return address
+
+    def txreplay(self, solfile, txjsonfile):
+        import json
+        with open(txjsonfile) as f:
+            txlist = json.load(f)
+
+        def cb(m, state, tx):
+            print(f'-> {tx.result}')
+
+        self.subscribe('did_close_transaction', cb)
+
+        def getpeople():
+            ppl = {}
+            for tx in txlist:
+                from_name = tx['from_name']
+                from_addr = tx['from_address']
+
+                to_name = tx['to_name']
+                to_addr = tx['to_address']
+
+
+                # TODO: we assume that the name and the address will always match
+                # each other for all txs
+
+                if from_name not in ppl:
+                    ppl[from_name] = from_addr
+
+                if to_name not in ppl:
+                    ppl[to_name] = to_addr
+
+            return ppl
+
+
+
+        ppl = getpeople()
+
+
+        # roughly copypasted from multi tx analysis
+        # NOTE IMPORTANT: the balance must be the same as multi tx analysis
+        # we set the addresses specifically to what is in the tx trace
+        owner_account = self.create_account(balance=1000, name='owner', address=ppl['owner'])
+        attacker_account = self.create_account(balance=1000, name='attacker', address=ppl['attacker'])
+
+        with open(solfile) as f:
+            print('creation')
+            contract_account = self.solidity_create_contract(f, owner=owner_account)
+
+        # ok so now the initial state is roughly created
+
+        for tx in txlist:
+            if tx['type'] == 'CREATE':
+                continue
+
+            tx_from_name = tx['from_name']
+            tx_to_name = tx['to_name']
+
+            fromm = {
+                'owner': owner_account,
+                'attacker': attacker_account,
+                'contract0': contract_account,
+            }[tx_from_name]
+
+            to = {
+                'owner': owner_account,
+                'attacker': attacker_account,
+                'contract0': contract_account,
+            }[tx_to_name]
+
+            metadata = self.get_metadata(tx['to_address'])
+            if metadata is not None:
+                calldata = binascii.unhexlify(tx['data'])
+                print(metadata.parse_tx(calldata))
+
+            self.transaction(
+                caller=fromm,
+                address=to,
+                data=binascii.unhexlify(tx['data']),
+                value=tx['value'],
+                gas=tx['gas'],
+            )
+            # logger.info("%d alive states, %d terminated states", self.count_running_states(), self.count_terminated_states())
+
 
     def multi_tx_analysis(self, solidity_filename, contract_name=None, tx_limit=None, tx_use_coverage=True, tx_send_ether=True, tx_account="attacker", args=None):
         owner_account = self.create_account(balance=1000, name='owner')
@@ -2592,89 +2691,123 @@ class ManticoreEVM(Manticore):
             if is_something_symbolic:
                 summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
 
-        # Transactions
-        with testcase.open_stream('tx') as tx_summary:
-            is_something_symbolic = False
-            for tx in blockchain.human_transactions:  # external transactions
-                tx_summary.write("Transactions Nr. %d\n" % blockchain.transactions.index(tx))
+        with testcase.open_stream('tx.json') as tx_json_file:
+            txlist = []
 
-                # The result if any RETURN or REVERT
-                tx_summary.write("Type: %s (%d)\n" % (tx.sort, tx.depth))
-                caller_solution = state.solve_one(tx.caller)
-                state.constrain(tx.caller == caller_solution)
+            # Transactions
+            with testcase.open_stream('tx') as tx_summary:
+                is_something_symbolic = False
+                for tx in blockchain.human_transactions:  # external transactions
 
-                caller_name = self.account_name(caller_solution)
-                tx_summary.write("From: %s(0x%x) %s\n" % (caller_name, caller_solution, flagged(issymbolic(tx.caller))))
-                address_solution = state.solve_one(tx.address)
-                state.constrain(tx.address == address_solution)
+                    txlistentry = {}
 
-                caller_name = self.account_name(caller_solution)
-                address_name = self.account_name(address_solution)
-                tx_summary.write("To: %s(0x%x) %s\n" % (address_name, address_solution, flagged(issymbolic(tx.address))))
-                value_solution = state.solve_one(tx.value)
-                state.constrain(tx.value == value_solution)
-                tx_summary.write("Value: %d %s\n" % (value_solution, flagged(issymbolic(tx.value))))
+                    tx_summary.write("Transactions Nr. %d\n" % blockchain.transactions.index(tx))
 
-                gas_solution = state.solve_one(tx.gas)
-                state.constrain(tx.gas == gas_solution)
-                tx_summary.write("Gas used: %d %s\n" % (gas_solution, flagged(issymbolic(tx.gas))))
-                tx_data = state.solve_one(tx.data)
-                state.constrain(tx_data == tx.data)
+                    # The result if any RETURN or REVERT
+                    tx_summary.write("Type: %s (%d)\n" % (tx.sort, tx.depth))
 
-                tx_summary.write("Data: %s %s\n" % (binascii.hexlify(tx_data), flagged(issymbolic(tx.data))))
-                if tx.return_data is not None:
-                    return_data = state.solve_one(tx.return_data)
-                    state.constrain(tx.return_data == return_data)
- 
-                    tx_summary.write("Return_data: %s %s\n" % (binascii.hexlify(return_data), flagged(issymbolic(tx.return_data))))
+                    txlistentry['type'] = tx.sort
 
-                metadata = self.get_metadata(tx.address)
-                if tx.sort == 'CREATE':
-                    if metadata is not None:
-                        args_data = tx.data[len(metadata._init_bytecode):]
-                        arguments = ABI.deserialize(metadata.get_constructor_arguments(), state.solve_one(args_data))
-                        is_argument_symbolic = any(map(issymbolic, arguments))
-                        tx_summary.write('Function call:\n')
-                        tx_summary.write("Constructor(")
-                        tx_summary.write(','.join(map(repr, map(state.solve_one, arguments))))
-                        tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_argument_symbolic)))
 
-                if tx.sort == 'CALL':
-                    if metadata is not None:
-                        calldata = tx_data
-                        is_calldata_symbolic = issymbolic(tx.data)
+                    caller_solution = state.solve_one(tx.caller)
+                    caller_name = self.account_name(caller_solution)
+                    tx_summary.write("From: %s(0x%x) %s\n" % (caller_name, caller_solution, flagged(issymbolic(tx.caller))))
 
-                        function_id = calldata[:4]  # hope there is enough data
-                        signature = metadata.get_func_signature(function_id)
-                        function_name = metadata.get_func_name(function_id)
-                        if signature:
-                            _, arguments = ABI.deserialize(signature, calldata)
-                        else:
-                            arguments = (calldata,)
+                    txlistentry['from_name'] = caller_name
+                    txlistentry['from_address'] = caller_solution
 
+
+
+                    address_solution = state.solve_one(tx.address)
+                    address_name = self.account_name(address_solution)
+                    tx_summary.write("To: %s(0x%x) %s\n" % (address_name, address_solution, flagged(issymbolic(tx.address))))
+
+
+                    concretized_value = state.solve_one(tx.value)
+                    concretized_gas = state.solve_one(tx.gas)
+
+                    tx_summary.write("Value: %d %s\n" % (concretized_value, flagged(issymbolic(tx.value))))
+                    tx_summary.write("Gas used: %d %s\n" % (concretized_gas, flagged(issymbolic(tx.gas))))
+
+                    txlistentry['to_name'] = address_name
+                    txlistentry['to_address'] = address_solution
+
+                    txlistentry['value'] = concretized_value
+                    txlistentry['gas'] = concretized_gas
+
+
+
+                    tx_data = state.solve_one(tx.data)
+                    tx_summary.write("Data: %s %s\n" % (binascii.hexlify(tx_data), flagged(issymbolic(tx.data))))
+
+                    txlistentry['data'] = binascii.hexlify(tx_data).decode()
+
+
+
+                    if tx.return_data is not None:
+                        return_data = state.solve_one(tx.return_data)
+                        tx_summary.write("Return_data: %s %s\n" % (binascii.hexlify(return_data), flagged(issymbolic(tx.return_data))))
+                    metadata = self.get_metadata(tx.address)
+                    if tx.sort == 'CREATE':
+                        if metadata is not None:
+                            args_data = tx.data[len(metadata._init_bytecode):]
+                            arguments = ABI.deserialize(metadata.get_constructor_arguments(), state.solve_one(args_data))
+                            is_argument_symbolic = any(map(issymbolic, arguments))
+                            tx_summary.write('Function call:\n')
+                            tx_summary.write("Constructor(")
+                            tx_summary.write(','.join(map(repr, map(state.solve_one, arguments))))
+                            tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_argument_symbolic)))
+
+                    if tx.sort == 'CALL':
+                        if metadata is not None:
+                            calldata = state.solve_one(tx.data)
+                            is_calldata_symbolic = issymbolic(tx.data)
+
+                            function_id = calldata[:4]  # hope there is enough data
+                            signature = metadata.get_func_signature(function_id)
+                            function_name = metadata.get_func_name(function_id)
+                            if signature:
+                                _, arguments = ABI.deserialize(signature, calldata)
+                            else:
+                                arguments = (calldata,)
+
+                            return_data = None
+                            if tx.result == 'RETURN':
+                                ret_types = metadata.get_func_return_types(function_id)
+                                return_data = state.solve_one(tx.return_data)
+                                return_values = ABI.deserialize(ret_types, return_data)  # function return
+
+                        return_data = None
                         if tx.result == 'RETURN':
                             ret_types = metadata.get_func_return_types(function_id)
-                            #return_data = state.solve_one(tx.return_data)
+                            return_data = state.solve_one(tx.return_data)
                             return_values = ABI.deserialize(ret_types, return_data)  # function return
                             is_return_symbolic = issymbolic(tx.return_data)
 
-                        tx_summary.write('\n')
-                        tx_summary.write("Function call:\n")
-                        tx_summary.write("%s(" % function_name)
-                        tx_summary.write(','.join(map(repr, arguments)))
-                        tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_calldata_symbolic)))
+                            tx_summary.write('\n')
+                            tx_summary.write("Function call:\n")
+                            tx_summary.write("%s(" % function_name)
+                            tx_summary.write(','.join(map(repr, arguments)))
+                            tx_summary.write(') -> %s %s\n' % (tx.result, flagged(is_calldata_symbolic)))
 
                         if return_data is not None and tx.result == 'RETURN':
                             if len(return_values) == 1:
                                 return_values = return_values[0]
 
-                            tx_summary.write('return: %r %s\n' % (return_values, flagged(is_return_symbolic)))
-                        is_something_symbolic = is_calldata_symbolic or is_return_symbolic
+                                tx_summary.write('return: %r %s\n' % (return_values, flagged(is_return_symbolic)))
+                            is_something_symbolic = is_calldata_symbolic or is_return_symbolic
 
-                tx_summary.write('\n\n')
+                    tx_summary.write('\n\n')
 
-            if is_something_symbolic:
-                tx_summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
+                    # print(txlistentry)
+                    txlist.append(txlistentry)
+
+                if is_something_symbolic:
+                    tx_summary.write('\n\n(*) Example solution given. Value is symbolic and may take other values\n')
+
+            import json
+            # import pdb; pdb.set_trace()
+            tx_json_file.write(json.dumps(txlist))
 
         # logs
         with testcase.open_stream('logs') as logs_summary:
