@@ -1219,7 +1219,9 @@ class LazySMemory(SMemory):
         # also need to mark all of these addresses as now in the symbolic store
 
         accessrange = accessmax - accessmin
+        print('access range!', accessrange)
         if accessrange >= 0x10000000:  # random big number
+            print('BAILING')
             raise Exception('range too big for hybrid memory atm')
 
         curr_addr = accessmin
@@ -1284,7 +1286,9 @@ class LazySMemory(SMemory):
         i = size
         for addr in addrs_to_access:
             i -= 1
-            if issymbolic(addr) or addr in self.backed_by_symbolic_store:
+            # map_writable = 0
+            map_writable = self.access_ok(addr, 'w')
+            if issymbolic(addr) or (addr in self.backed_by_symbolic_store and map_writable):
                 retvals.append(self.bigarray[addr])
             else:
                 retvals.append(Memory.read(self, addr, 1)[0])
